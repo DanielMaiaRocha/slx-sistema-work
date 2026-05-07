@@ -1,0 +1,55 @@
+  static async listAll(req: Request, res: Response) {
+    const { offset = 0, limit = 20, status, search, startDate, endDate, month, year, allMonths } = req.query;
+    try {
+      const params: any = { offset, limit };
+      if (status === 'Pago') params.status = 'RECEIVED';
+      if (status === 'Pendente') params.status = 'PENDING';
+      if (status === 'Atrasado') params.status = 'OVERDUE';
+      if (search) params.description = search;
+
+      // Date Filtering
+      if (allMonths !== 'true') {
+        if (startDate && endDate) {
+          params['dueDate[ge]'] = startDate;
+          params['dueDate[le]'] = endDate;
+        } else {
+          // Default to current month or specified month/year
+          const now = new Date();
+          const m = (month !== undefined && month !== '') ? parseInt(month as string) : now.getMonth();
+          const y = (year !== undefined && year !== '') ? parseInt(year as string) : now.getFullYear();
+          
+          // Use YYYY-MM-DD format directly with Asaas v3 filter syntax
+          const firstDay = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+          const lastDayDate = new Date(y, m + 1, 0);
+          const lastDay = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+          
+          params['dueDate[ge]'] = firstDay;
+          params['dueDate[le]'] = lastDay;
+        }
+      }
+
+      console.log('Fetching financial records with params:', params);
+
+      const asaasResponse = await asaasApi.get('/payments', {
+        params
+      });
+      
+      const formatted = (asaasResponse.data.data || []).map((c: any) => ({
+        id: c.id,
+        description: c.description || 'Aluguel',
+        amount: c.value,
+        dueDate: c.dueDate,
+        status: c.status === 'RECEIVED' || c.status === 'CONFIRMED' ? 'Pago' : (c.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'),
+        customerName: c.customerName || c.customer,
+        type: 'Receita'
+      }));
+      
+      res.json({
+        data: formatted,
+        pagination: { total: asaasResponse.data.totalCount, offset: Number(offset), limit: Number(limit) }
+      });
+    } catch (error) {
+      console.error('Financial listAll error:', error);
+      res.status(500).json({ error: 'Failed to fetch real charges' });
+    }
+  }

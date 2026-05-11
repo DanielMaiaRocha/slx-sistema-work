@@ -9,8 +9,8 @@ export class DashboardController {
       console.log('📊 Starting dashboard stats generation...');
       const { month, year } = req.query;
       const now = new Date();
-      const m = (month !== undefined && month !== '') ? parseInt(month as string) : now.getMonth();
-      const y = (year !== undefined && year !== '') ? parseInt(year as string) : now.getFullYear();
+      const m = (month !== undefined && month !== '') ? parseInt(String(month)) : now.getMonth();
+      const y = (year !== undefined && year !== '') ? parseInt(String(year)) : now.getFullYear();
 
       const firstDay = `${y}-${String(m + 1).padStart(2, '0')}-01`;
       const lastDayDate = new Date(y, m + 1, 0);

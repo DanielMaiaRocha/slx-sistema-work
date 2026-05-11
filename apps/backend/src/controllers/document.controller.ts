@@ -8,7 +8,7 @@ export class DocumentController {
   static async listMyDocuments(req: Request, res: Response) {
     const userId = req.user?.id;
     const tenantId = req.tenantId;
-    const { visibility } = req.query; // Optional filter: "TENANT" or "LANDLORD"
+    const visibility = req.query.visibility as string | undefined; // Optional filter: "TENANT" or "LANDLORD"
 
     try {
       const where: any = { 

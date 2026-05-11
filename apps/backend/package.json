@@ -36,6 +36,9 @@
     "@types/node": "^25.6.0",
     "@types/node-cron": "^3.0.11",
     "@types/pdf-parse": "^1.1.5",
+    "@types/jsonwebtoken": "^9.0.3",
+    "@types/bcryptjs": "^3.0.3",
+    "@types/cors": "^2.8.6",
     "ts-node-dev": "^2.0.0",
     "typescript": "^6.0.3"
   }

@@ -138,24 +138,24 @@ export default function UsersPage() {
       if (editingDocId) {
         await fetchApi(`/documents/${editingDocId}`, {
           method: 'PUT',
-          body: {
+          body: JSON.stringify({
             name: docForm.name,
             visibility: docForm.visibility,
             type: docForm.type,
             ...(fileUrl && { url: fileUrl })
-          }
+          })
         });
         toast.success('Documento atualizado!');
       } else {
         await fetchApi('/documents', {
           method: 'POST',
-          body: {
+          body: JSON.stringify({
             name: docForm.name,
             url: fileUrl,
             userId: docUser.id,
             visibility: docForm.visibility,
             type: docForm.type
-          }
+          })
         });
         toast.success('Documento anexado!');
       }
@@ -309,7 +309,7 @@ export default function UsersPage() {
     try {
       await fetchApi(`/users/${propertyUser.id}/properties`, {
         method: 'PUT',
-        body: { properties: userProperties }
+        body: JSON.stringify({ properties: userProperties })
       });
       toast.success('Imóveis atualizados com sucesso!');
       setIsPropertyModalOpen(false);

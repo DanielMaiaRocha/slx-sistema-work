@@ -369,7 +369,7 @@ export default function EditInspectionPage() {
   );
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-32">
+    <div className="w-full py-4 sm:py-8 space-y-5 sm:space-y-8 pb-32">
       <div className="flex items-center justify-between">
         <Link href={`/dashboard/inspections/${id}`} className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors">
           <ArrowLeft className="w-5 h-5" />

@@ -42,8 +42,12 @@ export default function DashboardPage() {
   ];
 
   const hasPerm = (perm: string) => {
-    if (user?.role === 'ADMIN' || user?.role === 'OWNER') return true;
-    if (user?.role === 'TENANT') {
+    if (!user?.role) return false;
+    const userRoles = user.role.split(',');
+    if (userRoles.includes('ADMIN') || userRoles.includes('OWNER')) return true;
+    
+    // For both TENANT and LANDLORD roles, check granular permissions
+    if (userRoles.includes('TENANT') || userRoles.includes('LANDLORD')) {
       return !!user?.permissions?.[perm];
     }
     return false;
@@ -129,7 +133,7 @@ export default function DashboardPage() {
   const showDocs = branding?.config?.dashboard?.showDocs !== false;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="w-full py-4 sm:py-6 space-y-5 sm:space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div className="space-y-0.5">
@@ -144,7 +148,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight"
+            className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight"
           >
             {branding?.config?.welcomeMessage || 'Bem-vindo ao Painel SLX'}
           </motion.h1>
@@ -199,19 +203,19 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       {branding?.config?.dashboard?.showStats !== false && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-6 w-full">
           {statsCards.map((stat, i) => (
             <motion.div 
               key={i}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="glass-card p-6 group relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-sm bg-white"
+              className="glass-card p-4 sm:p-6 group relative overflow-hidden flex flex-col justify-between min-h-[120px] sm:min-h-[160px] shadow-sm bg-white"
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">{stat.label}</p>
-                  <h3 className="text-3xl font-black text-slate-900 leading-tight">
+                  <p className="text-slate-400 text-[8px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em]">{stat.label}</p>
+                  <h3 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
                     {loading ? '...' : stat.value}
                   </h3>
                   <p className="text-slate-400 text-[10px] font-medium">{stat.sub}</p>
@@ -269,7 +273,7 @@ export default function DashboardPage() {
                         <FileText className="w-5 h-5" style={branding?.primaryColor ? { color: branding.primaryColor } : {}} />
                       </div>
                       <div>
-                        <div className="text-slate-900 font-bold text-sm leading-tight">{doc.name}</div>
+                        <div className="text-slate-900 font-bold text-sm leading-tight truncate max-w-[200px] sm:max-w-none">{doc.name}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-slate-400 text-[10px] font-medium">{doc.date}</span>
                           <span className="w-1 h-1 rounded-full bg-slate-200"></span>

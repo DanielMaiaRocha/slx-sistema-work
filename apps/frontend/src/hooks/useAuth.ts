@@ -17,7 +17,7 @@ export const useAuth = () => {
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string, tenantSlug: string) => {
+  const login = async (identifier: string, password: string, tenantSlug: string, intendedRole?: string) => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
@@ -25,7 +25,7 @@ export const useAuth = () => {
           'Content-Type': 'application/json',
           'x-tenant-slug': tenantSlug 
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ identifier, password, intendedRole })
       });
 
       if (!response.ok) {

@@ -27,6 +27,11 @@ const formatPhone = (v: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+const isProprietario = (role: string) => {
+  const roles = (role || '').split(',');
+  return roles.includes('LANDLORD') || roles.includes('OWNER');
+};
+
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -346,69 +351,68 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Usuários</h1>
-          <p className="text-slate-500 text-sm">Base de dados sincronizada com o Asaas.</p>
-        </div>
-        <button 
-          onClick={() => setIsCreateModalOpen(true)}
-          className="yellow-button px-6 py-3 rounded-xl shadow-xl shadow-primary/20 flex items-center gap-2 cursor-pointer"
-        >
-          <Users className="w-4 h-4" />
-          Novo Proprietário
-        </button>
+    <div className="w-full py-4 sm:py-8 space-y-5 sm:space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">Usuários</h1>
+        <p className="text-slate-400 text-[9px] sm:text-xs font-black uppercase tracking-[0.15em]">Gestão de Base Sincronizada</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+      <button 
+        onClick={() => setIsCreateModalOpen(true)}
+        className="yellow-button w-full sm:w-auto px-8 py-3.5 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-3 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all"
+      >
+        <Plus className="w-4 h-4 text-black" />
+        <span className="font-black uppercase tracking-widest text-[10px] sm:text-xs text-black">Novo Proprietário</span>
+      </button>
+
+      <div className="glass-card p-4 sm:p-6 space-y-3 bg-white border-slate-200 shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
           <input 
             value={filters.search}
             onChange={(e) => { setFilters(p => ({ ...p, search: e.target.value })); setPage(0); }}
             placeholder="Buscar por nome, CPF ou e-mail..."
-            className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-slate-900 focus:border-primary/50 outline-none transition-all text-sm shadow-sm"
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 pl-10 pr-4 text-slate-900 focus:border-primary/50 focus:bg-white outline-none transition-all text-sm placeholder:text-slate-300"
           />
         </div>
 
-        <div className="relative md:w-64" ref={dropdownRef}>
+        <div className="relative" ref={dropdownRef}>
           <button 
             onClick={() => setIsRoleOpen(!isRoleOpen)}
-            className="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-slate-900 flex items-center justify-between hover:border-primary/30 transition-all group cursor-pointer text-sm shadow-sm"
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-3 flex items-center justify-between hover:border-primary/30 transition-all cursor-pointer text-xs"
           >
-            <div className="flex items-center gap-3">
-              <Shield className={`w-5 h-5 ${filters.role ? 'text-primary' : 'text-slate-400'}`} />
-              <span className={filters.role ? 'text-slate-900 font-medium' : 'text-slate-400'}>
-                {filters.role ? (filters.role === 'TENANT' ? 'Inquilinos' : (filters.role === 'OWNER' ? 'Proprietários' : 'Administradores')) : 'Todos os Cargos'}
+            <div className="flex items-center gap-2">
+              <Shield className={`w-3.5 h-3.5 ${filters.role ? 'text-primary' : 'text-slate-400'}`} />
+              <span className={filters.role ? 'text-slate-900 font-bold' : 'text-slate-400'}>
+                {filters.role ? (filters.role === 'TENANT' ? 'Inquilinos' : (filters.role === 'LANDLORD' ? 'Proprietários' : 'Administradores')) : 'Todos os Cargos'}
               </span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-slate-400 group-hover:text-primary transition-transform ${isRoleOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isRoleOpen ? 'rotate-180' : ''}`} />
           </button>
 
           <AnimatePresence>
             {isRoleOpen && (
               <motion.div 
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute z-50 top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
               >
                 {[
                   { label: 'Todos os Cargos', value: '' },
                   { label: 'Inquilinos', value: 'TENANT' },
-                  { label: 'Proprietários', value: 'OWNER' },
+                  { label: 'Proprietários', value: 'LANDLORD' },
                   { label: 'Administradores', value: 'ADMIN' },
                 ].map((role) => (
                   <button
                     key={role.value}
                     onClick={() => selectRole(role.value)}
-                    className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-slate-50 cursor-pointer flex items-center justify-between ${
+                    className={`w-full text-left px-3 py-2.5 text-xs transition-colors hover:bg-slate-50 cursor-pointer flex items-center justify-between ${
                       filters.role === role.value ? 'text-primary bg-primary/5 font-bold' : 'text-slate-600'
                     }`}
                   >
                     {role.label}
-                    {filters.role === role.value && <Check className="w-4 h-4 text-primary" />}
+                    {filters.role === role.value && <Check className="w-3.5 h-3.5 text-primary" />}
                   </button>
                 ))}
               </motion.div>
@@ -417,16 +421,133 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="glass-card overflow-hidden bg-white shadow-sm border-slate-200">
+      {/* Mobile Cards View */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="glass-card p-8 text-center text-slate-400 text-sm italic bg-white border-slate-200 shadow-sm">Sincronizando...</div>
+        ) : users.length === 0 ? (
+          <div className="glass-card p-8 text-center text-slate-400 text-sm italic bg-white border-slate-200 shadow-sm">Nenhum usuário encontrado.</div>
+        ) : users.map((user, i) => (
+          <motion.div 
+            key={user.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.03 }}
+            className="glass-card p-4 bg-white border-slate-200 shadow-sm space-y-3"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900 font-black text-sm shrink-0">
+                {(user.name || 'U')[0].toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-slate-900 leading-tight truncate">{user.name}</h3>
+                <p className="text-[10px] text-slate-400 truncate">{user.email && user.email !== 'N/A' ? user.email : 'Sem e-mail'}</p>
+              </div>
+              <button 
+                onClick={() => { setEditingUser({...user}); setIsModalOpen(true); }}
+                className="p-1.5 text-slate-400 rounded-lg active:bg-slate-100 shrink-0"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-50">
+               <div>
+                 <p className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Documento</p>
+                 <p className="text-xs font-bold text-slate-600 font-mono">{formatCpfCnpj(user.cpfCnpj)}</p>
+               </div>
+               <div>
+                 <p className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Contato</p>
+                 <p className="text-xs font-bold text-slate-600">{formatPhone(user.phone)}</p>
+               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(user.role || 'TENANT').split(',').map((r: string) => (
+                <span key={r} className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider bg-slate-50 text-slate-500 px-2 py-1 rounded-md border border-slate-100">
+                   <Shield className={`w-2.5 h-2.5 ${r === 'ADMIN' ? 'text-rose-500' : 'text-primary'}`} />
+                   {r === 'ADMIN' ? 'Admin' : (r === 'OWNER' || r === 'LANDLORD' ? 'Proprietário' : 'Inquilino')}
+                </span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-3 border-t border-slate-50">
+              {isProprietario(user.role) && (
+                <button 
+                  onClick={() => handleEditProperties(user)}
+                  className="flex flex-col items-center justify-center gap-0.5 py-2.5 bg-slate-900 text-[#FFC107] rounded-lg transition-all active:scale-95"
+                >
+                  <Home className="w-3.5 h-3.5" />
+                  <span className="text-[7px] font-bold uppercase tracking-wider">Imóveis</span>
+                </button>
+              )}
+              <button 
+                onClick={() => { 
+                  setDocUser(user); 
+                  setIsDocModalOpen(true); 
+                  setDocModalType('CONTRACT');
+                  setDocForm({ name: 'Contrato de Locação', visibility: 'ALL', type: 'CONTRACT_LEASE' }); 
+                  loadUserDocs(user.id); 
+                }}
+                className="flex flex-col items-center justify-center gap-0.5 py-2.5 bg-primary/10 text-primary rounded-lg transition-all active:scale-95"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span className="text-[7px] font-bold uppercase tracking-wider">Contrato</span>
+              </button>
+              <button 
+                onClick={() => { 
+                  setDocUser(user); 
+                  setIsDocModalOpen(true); 
+                  setDocModalType('DOCUMENT');
+                  setDocForm({ name: '', visibility: 'ALL', type: 'DOCUMENT' }); 
+                  loadUserDocs(user.id); 
+                }}
+                className="flex flex-col items-center justify-center gap-0.5 py-2.5 bg-slate-50 text-slate-400 rounded-lg transition-all active:scale-95 border border-slate-100"
+              >
+                <FilePlus className="w-3.5 h-3.5" />
+                <span className="text-[7px] font-bold uppercase tracking-wider">Arquivos</span>
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Mobile Pagination */}
+      <div className="sm:hidden">
+        {!loading && pagination && totalPages > 1 && (
+          <div className="flex items-center justify-between pt-3">
+            <p className="text-[9px] text-slate-400 font-bold">{page + 1}/{totalPages}</p>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 disabled:opacity-30 active:scale-90">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {getPageNumbers().slice(0, 3).map(p => (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`w-8 h-8 rounded-lg text-[10px] font-bold ${page === p ? 'bg-primary text-white' : 'bg-white border border-slate-100 text-slate-400'}`}>
+                  {p + 1}
+                </button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                className="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 disabled:opacity-30 active:scale-90">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden sm:block glass-card overflow-hidden bg-white shadow-sm border-slate-200 rounded-3xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-slate-100">
-                <th className="p-4 text-slate-400 font-medium text-sm">Usuário / E-mail</th>
-                <th className="p-4 text-slate-400 font-medium text-sm">CPF/CNPJ</th>
-                <th className="p-4 text-slate-400 font-medium text-sm">Telefone</th>
-                <th className="p-4 text-slate-400 font-medium text-sm">Cargo</th>
-                <th className="p-4 text-slate-400 font-medium text-sm text-right">Ações</th>
+              <tr className="border-b border-slate-100 bg-slate-50/30">
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Usuário / E-mail</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">CPF/CNPJ</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Telefone</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Cargos</th>
+                <th className="p-5 text-slate-400 font-bold text-[10px] uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -440,46 +561,48 @@ export default function UsersPage() {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.02 }}
-                  className="hover:bg-slate-50 transition-colors group"
+                  className="hover:bg-slate-50/50 transition-colors group"
                 >
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-900 font-black text-sm shrink-0 border border-slate-200">
+                  <td className="p-5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900 font-black text-sm shrink-0 border border-slate-200 group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary transition-all">
                         {(user.name || 'U')[0].toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-slate-900 font-bold text-sm leading-tight flex items-center gap-2">
+                        <div className="text-slate-900 font-black text-sm leading-tight flex items-center gap-2">
                           {user.name}
-                          {user.isLocalOverride && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest border border-primary/20">Dashboard</span>}
+                          {user.isLocalOverride && <span className="text-[8px] bg-primary/10 text-primary px-2 py-0.5 rounded-lg font-black uppercase tracking-widest border border-primary/20">Dashboard</span>}
                         </div>
-                        <div className="text-slate-500 text-[10px] flex items-center gap-1 mt-0.5">
-                          <Mail className="w-3 h-3 text-slate-400" />
+                        <div className="text-slate-500 text-[11px] font-medium flex items-center gap-1.5 mt-1">
+                          <Mail className="w-3.5 h-3.5 text-slate-300" />
                           {user.email}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 text-slate-600 font-mono text-xs tracking-tight">{formatCpfCnpj(user.cpfCnpj)}</td>
-                  <td className="p-4 text-slate-600 text-xs">{formatPhone(user.phone)}</td>
-                  <td className="p-4">
+                  <td className="p-5 text-slate-600 font-mono text-xs tracking-tight">{formatCpfCnpj(user.cpfCnpj)}</td>
+                  <td className="p-5 text-slate-600 font-medium text-xs">{formatPhone(user.phone)}</td>
+                  <td className="p-5">
                     <div className="flex flex-wrap gap-1.5">
                       {(user.role || 'TENANT').split(',').map((r: string) => (
-                        <div key={r} className="flex items-center gap-1.5 text-slate-500 text-[9px] font-black uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                        <div key={r} className="flex items-center gap-1.5 text-slate-500 text-[9px] font-black uppercase tracking-widest bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
                           <Shield className={`w-3 h-3 ${r === 'ADMIN' ? 'text-rose-500' : 'text-slate-400'}`} />
                           {r === 'ADMIN' ? 'Admin' : (r === 'OWNER' || r === 'LANDLORD' ? 'Proprietário' : 'Inquilino')}
                         </div>
                       ))}
                     </div>
                   </td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => handleEditProperties(user)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-[#FFC107] hover:bg-black rounded-xl transition-all text-[10px] font-black uppercase tracking-widest group shadow-md cursor-pointer"
-                      >
-                        <Home className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                        Imóveis
-                      </button>
+                  <td className="p-5 text-right">
+                    <div className="flex items-center justify-end gap-2.5">
+                      {isProprietario(user.role) && (
+                        <button 
+                          onClick={() => handleEditProperties(user)}
+                          className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 text-[#FFC107] hover:bg-black rounded-xl transition-all text-[10px] font-black uppercase tracking-widest group shadow-md cursor-pointer active:scale-95"
+                        >
+                          <Home className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          Imóveis
+                        </button>
+                      )}
                       <button 
                         onClick={() => { 
                           setDocUser(user); 
@@ -488,9 +611,9 @@ export default function UsersPage() {
                           setDocForm({ name: 'Contrato de Locação', visibility: 'ALL', type: 'CONTRACT_LEASE' }); 
                           loadUserDocs(user.id); 
                         }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all text-[10px] font-black uppercase tracking-widest group shadow-sm cursor-pointer"
+                        className="flex items-center gap-2 px-3.5 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all text-[10px] font-black uppercase tracking-widest group shadow-sm cursor-pointer active:scale-95"
                       >
-                        <FileText className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                        <FileText className="w-4 h-4 group-hover:scale-110 transition-transform" />
                         Contrato
                       </button>
                       <button 
@@ -501,18 +624,17 @@ export default function UsersPage() {
                           setDocForm({ name: '', visibility: 'ALL', type: 'DOCUMENT' }); 
                           loadUserDocs(user.id); 
                         }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest group shadow-sm cursor-pointer"
+                        className="p-2.5 bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
                         title="Anexar Documentos"
                       >
-                        <FilePlus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                        Arquivos
+                        <FilePlus className="w-4.5 h-4.5" />
                       </button>
                       <button 
                         onClick={() => { setEditingUser({...user}); setIsModalOpen(true); }}
-                        className="p-2 bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                        className="p-2.5 bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
                         title="Editar Perfil"
                       >
-                        <MoreVertical className="w-4 h-4" />
+                        <MoreVertical className="w-4.5 h-4.5" />
                       </button>
                     </div>
                   </td>

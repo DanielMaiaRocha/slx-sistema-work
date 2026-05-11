@@ -166,11 +166,11 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto pb-32">
+    <div className="w-full py-4 sm:py-8 space-y-5 sm:space-y-8 pb-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">Configurações do Painel</h1>
-          <p className="text-slate-500 font-medium text-sm mt-1">Personalize a identidade visual e as funcionalidades da sua plataforma.</p>
+          <h1 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">Configurações</h1>
+          <p className="text-slate-400 text-[9px] sm:text-xs font-black uppercase tracking-[0.15em]">Identidade visual e funcionalidades</p>
         </div>
         <button 
           onClick={revertToDefault}
@@ -181,33 +181,32 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        {/* Navigation Sidebar */}
-        <div className="lg:col-span-3 space-y-2.5">
-          {[
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-10">
+        {/* Navigation */}
+        <div className="lg:col-span-3">
+          <div className="flex lg:flex-col gap-2 overflow-x-auto scrollbar-hide pb-2 lg:pb-0">[
+            {[
             { icon: Palette, label: 'Aparência' },
             { icon: LayoutDashboard, label: 'Dashboard' },
             { icon: LinkIcon, label: 'Ações Rápidas' },
             { icon: Globe, label: 'Integrações' },
             { icon: Shield, label: 'Segurança' },
           ].map((item, i) => (
-            <button 
-              key={i}
-              onClick={() => setActiveTab(item.label)}
-              className={cn(
-                "w-full flex items-center justify-between px-6 py-4.5 rounded-[1.5rem] transition-all duration-300 font-black text-[10px] uppercase tracking-widest group shadow-sm",
-                activeTab === item.label 
-                  ? "bg-primary text-black shadow-xl shadow-primary/20" 
-                  : "bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-900 border border-slate-100"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon className={cn("w-4.5 h-4.5", activeTab === item.label ? "text-black" : "text-slate-300 group-hover:text-primary transition-colors")} />
-                {item.label}
-              </div>
-              {activeTab === item.label && <ChevronRight className="w-4 h-4" />}
-            </button>
-          ))}
+              <button 
+                key={i}
+                onClick={() => setActiveTab(item.label)}
+                className={cn(
+                  "shrink-0 flex items-center gap-2 px-4 py-3 lg:px-6 lg:py-4 rounded-xl lg:rounded-2xl transition-all font-bold text-[9px] lg:text-[10px] uppercase tracking-widest whitespace-nowrap",
+                  activeTab === item.label 
+                    ? "bg-primary text-black shadow-lg shadow-primary/20" 
+                    : "bg-white text-slate-400 hover:bg-slate-50 border border-slate-100"
+                )}
+              >
+                <item.icon className={cn("w-4 h-4", activeTab === item.label ? "text-black" : "text-slate-300")} />
+                <span className="hidden sm:inline lg:inline">{item.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Content Area */}
@@ -218,7 +217,7 @@ export default function SettingsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="bg-white border border-slate-200 rounded-[2.5rem] p-10 space-y-12 shadow-sm"
+              className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-8 space-y-8 sm:space-y-12 shadow-sm"
             >
               {/* --- TAB: APARÊNCIA --- */}
               {activeTab === 'Aparência' && (
@@ -241,7 +240,7 @@ export default function SettingsPage() {
                           type="text" 
                           value={settings.name}
                           onChange={(e) => setSettings({...settings, name: e.target.value})}
-                          className="w-full bg-white border border-slate-200 rounded-2xl py-4.5 px-6 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
                         />
                       </div>
                       <div className="space-y-2.5">
@@ -269,8 +268,8 @@ export default function SettingsPage() {
 
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Logo Oficial</label>
-                      <div className="flex items-center gap-8 p-8 rounded-[2rem] bg-slate-50 border border-slate-200 shadow-inner group/logo">
-                        <div className="w-28 h-28 rounded-2xl bg-white border border-slate-200 flex items-center justify-center p-5 shrink-0 relative group overflow-hidden shadow-xl shadow-slate-200/50">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 p-4 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200 shadow-inner group/logo">
+                        <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-white border border-slate-200 flex items-center justify-center p-4 shrink-0 relative group overflow-hidden shadow-xl shadow-slate-200/50">
                             {settings.logoUrl ? (
                               <img src={settings.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
                             ) : (
@@ -315,7 +314,7 @@ export default function SettingsPage() {
                        </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8">
                       {[
                         { label: 'Primária', key: 'primaryColor', desc: 'Botões e ícones' },
                         { label: 'Secundária', key: 'secondaryColor', desc: 'Destaques' },
@@ -335,7 +334,7 @@ export default function SettingsPage() {
                                 if (c.isConfig) setSettings({...settings, config: {...settings.config, [c.key]: e.target.value}});
                                 else setSettings({...settings, [c.key]: e.target.value});
                               }}
-                              className="w-full h-20 rounded-2xl cursor-pointer bg-transparent border-none outline-none"
+                              className="w-full h-14 sm:h-20 rounded-xl sm:rounded-2xl cursor-pointer bg-transparent border-none outline-none"
                             />
                             <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center opacity-0 group-hover/color:opacity-100 transition-opacity">
                                <Check className="w-3 h-3 text-slate-900" />
@@ -367,7 +366,7 @@ export default function SettingsPage() {
                         type="text" 
                         value={settings.config.welcomeMessage}
                         onChange={(e) => setSettings({...settings, config: {...settings.config, welcomeMessage: e.target.value}})}
-                        className="w-full bg-white border border-slate-200 rounded-2xl py-4.5 px-6 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                        className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
                       />
                     </div>
                   </section>
@@ -389,9 +388,9 @@ export default function SettingsPage() {
                         { key: 'showDocs', label: 'Últimos Documentos', icon: FileText, desc: 'Acesso rápido aos arquivos' },
                         { key: 'showQuickActions', label: 'Ações Rápidas', icon: Plus, desc: 'Botões de atalho personalizados' },
                       ].map((mod) => (
-                        <div key={mod.key} className="flex items-center justify-between p-6 rounded-[2rem] bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                        <div key={mod.key} className="flex items-center justify-between p-4 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shrink-0">
                                 <mod.icon className="w-6 h-6" />
                               </div>
                               <div>
@@ -453,7 +452,7 @@ export default function SettingsPage() {
                           <p className="text-slate-400 font-medium max-w-xs mx-auto text-sm italic">Nenhum atalho configurado. Use os botões para acesso rápido a links externos.</p>
                         </div>
                       ) : settings.config.quickLinks.map((link) => (
-                        <div key={link.id} className="grid grid-cols-1 md:grid-cols-12 gap-6 p-8 rounded-[2rem] bg-white border border-slate-200 items-end shadow-sm hover:shadow-md transition-all group">
+                        <div key={link.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-6 p-4 sm:p-8 rounded-2xl bg-white border border-slate-200 items-end shadow-sm hover:shadow-md transition-all group">
                           <div className="md:col-span-4 space-y-2.5">
                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome do Botão</label>
                              <input 
@@ -488,7 +487,7 @@ export default function SettingsPage() {
               {/* --- TAB: INTEGRAÇÕES --- */}
               {activeTab === 'Integrações' && (
                 <section className="space-y-10">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 p-10 rounded-[2.5rem] bg-slate-50 border border-slate-200">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-8 p-5 sm:p-10 rounded-2xl bg-slate-50 border border-slate-200">
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                          <div className="p-3 bg-white rounded-2xl border border-slate-100 shadow-sm">
@@ -508,7 +507,7 @@ export default function SettingsPage() {
                         finally { setIsSyncing(false); }
                       }}
                       disabled={isSyncing}
-                      className={cn("yellow-button text-black px-10 py-5 rounded-3xl font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50", isSyncing && "animate-pulse")}
+                      className={cn("yellow-button w-full sm:w-auto text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50", isSyncing && "animate-pulse")}
                     >
                       <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
                       {isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}
@@ -526,7 +525,7 @@ export default function SettingsPage() {
                 <button 
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="yellow-button text-black px-14 py-5 rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-4 disabled:opacity-50"
+                  className="yellow-button w-full sm:w-auto text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <Save className="w-5.5 h-5.5" />
                   {isSaving ? 'Salvando...' : 'Salvar e Aplicar Alterações'}

@@ -46,15 +46,15 @@ export default function InspectionsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">Vistorias de Imóveis</h1>
-          <p className="text-slate-500 text-sm mt-1 font-medium">Gerencie e gere laudos profissionais de vistoria.</p>
+    <div className="w-full py-4 sm:py-8 space-y-5 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Vistorias</h1>
+          <p className="text-slate-400 text-[9px] sm:text-xs font-black uppercase tracking-[0.15em]">Laudos profissionais de vistoria</p>
         </div>
         <Link 
           href="/dashboard/inspections/new"
-          className="yellow-button px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 w-full md:w-auto justify-center"
+          className="yellow-button w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center gap-2 justify-center"
         >
           <Plus className="w-4 h-4" />
           Nova Vistoria
@@ -62,19 +62,19 @@ export default function InspectionsPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
           <input 
             type="text" 
             placeholder="Buscar por endereço..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl py-3.5 pl-12 pr-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all shadow-sm"
+            className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all shadow-sm placeholder:text-slate-300"
           />
         </div>
-        <button className="w-full md:w-auto px-6 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-          <Filter className="w-4 h-4 text-slate-400" />
+        <button className="w-full sm:w-auto px-5 py-3 bg-white border border-slate-200 rounded-xl text-slate-600 text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+          <Filter className="w-3.5 h-3.5 text-slate-400" />
           Filtros
         </button>
       </div>
@@ -103,7 +103,7 @@ export default function InspectionsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
           {filtered.map((ins, i) => (
             <motion.div 
               key={ins.id}
@@ -112,7 +112,7 @@ export default function InspectionsPage() {
               transition={{ delay: i * 0.05 }}
               className="glass-card group hover:border-primary/30 transition-all flex flex-col h-full bg-white border-slate-200 shadow-sm"
             >
-              <div className="p-6 space-y-4 flex-1">
+              <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 flex-1">
                 <div className="flex items-start justify-between">
                   <div className="p-3.5 bg-primary/10 rounded-2xl text-primary border border-primary/20 shadow-sm group-hover:bg-primary group-hover:text-black transition-all duration-300">
                     <MapPin className="w-6 h-6" />

@@ -11,7 +11,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 export class TenantAuthController {
   static async login(req: Request, res: Response) {
-    const { cpf, password } = req.body;
+    const { cpf, password, intendedRole } = req.body;
 
     if (!cpf || !password) {
       return res.status(400).json({ error: 'CPF e senha são obrigatórios' });
@@ -21,8 +21,6 @@ export class TenantAuthController {
       const cleanCpf = cpf.replace(/\D/g, '');
       const tenantId = req.tenantId;
 
-      console.log(`🔑 [LOGIN ATTEMPT] CPF: ${cleanCpf}, Tenant: ${tenantId}`);
-
       const user = await prisma.user.findFirst({
         where: { 
           cpf: cleanCpf,
@@ -31,18 +29,19 @@ export class TenantAuthController {
         include: { tenant: true }
       });
 
-      if (user) {
-        console.log(`👤 [USER FOUND] Roles: ${user.role}`);
-      } else {
-        console.log(`❌ [USER NOT FOUND] CPF: ${cleanCpf}`);
+      if (!user) {
+        return res.status(401).json({ error: 'Usuário não encontrado' });
       }
 
-      const allowedRoles = [Role.TENANT, Role.LANDLORD, Role.OWNER];
-      const userRoles = user?.role.split(',') || [];
-      const hasAllowedRole = userRoles.some(r => allowedRoles.includes(r.trim() as Role));
-
-      if (!user || !hasAllowedRole) {
-        return res.status(401).json({ error: 'Inquilino não encontrado' });
+      // Check roles
+      const allRoles = user.role.split(',').map(r => r.trim());
+      
+      // If logging into a specific portal, verify access
+      if (intendedRole) {
+        if (!allRoles.includes(intendedRole) && !allRoles.includes('ADMIN') && !allRoles.includes('OWNER')) {
+          const roleLabel = intendedRole === 'TENANT' ? 'Inquilino' : 'Proprietário';
+          return res.status(403).json({ error: `Você não possui acesso ao portal de ${roleLabel}.` });
+        }
       }
 
       const isValid = await bcrypt.compare(password, user.password);
@@ -50,11 +49,18 @@ export class TenantAuthController {
         return res.status(401).json({ error: 'Senha incorreta' });
       }
 
+      // Filter session role based on portal
+      let sessionRole = user.role;
+      if (intendedRole && (allRoles.includes(intendedRole) || allRoles.includes('ADMIN'))) {
+        // If they are Admin, keep all roles. If they are just dual-role, force the intended one for this portal session.
+        sessionRole = allRoles.includes('ADMIN') ? user.role : intendedRole;
+      }
+
       const token = jwt.sign(
         { 
           id: user.id, 
           email: user.email, 
-          role: user.role, 
+          role: sessionRole, 
           tenantId: user.tenantId,
           asaasId: user.asaasId,
           name: user.name
@@ -68,7 +74,7 @@ export class TenantAuthController {
         user: { 
           id: user.id, 
           name: user.name, 
-          role: user.role,
+          role: sessionRole,
           asaasId: user.asaasId,
           tenant: {
             name: user.tenant?.name,

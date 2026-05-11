@@ -36,7 +36,11 @@ export default function LandlordLoginPage() {
     try {
       const response = await fetchApi('/auth/login-tenant', {
         method: 'POST',
-        body: JSON.stringify({ cpf: cpf.replace(/\D/g, ''), password }),
+        body: JSON.stringify({ 
+          cpf: cpf.replace(/\D/g, ''), 
+          password,
+          intendedRole: 'LANDLORD'
+        }),
       });
 
       Cookies.set('token', response.token, { expires: 7 });

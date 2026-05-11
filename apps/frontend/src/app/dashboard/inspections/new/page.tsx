@@ -360,48 +360,84 @@ export default function NewInspectionPage() {
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-6xl mx-auto pb-32">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-6">
+    <div className="w-full py-4 sm:py-8 space-y-5 sm:space-y-8 pb-32">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center justify-between w-full sm:w-auto gap-6">
           <Link href="/dashboard/inspections" className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
+            <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
+              <ArrowLeft className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Voltar</span>
           </Link>
           <button 
             onClick={resetForm}
-            className="text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-600 transition-colors flex items-center gap-1.5"
+            className="text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-600 transition-colors flex items-center gap-1.5 p-2 hover:bg-rose-50 rounded-xl"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            Limpar Rascunho
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Limpar Rascunho</span>
           </button>
         </div>
+        
+        {/* Desktop Finalize Button */}
         <button 
           onClick={handleSave}
           disabled={isSaving}
-          className="yellow-button text-black px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
+          className="hidden sm:flex yellow-button text-black px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 items-center gap-2 disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
           {isSaving ? 'Salvando...' : 'Finalizar e Gerar Laudo'}
         </button>
       </div>
 
-      <div className="flex items-center justify-center gap-6 mb-12">
-        {[1, 2].map(s => (
-          <div key={s} className="flex items-center gap-3">
-            <div className={cn(
-              "w-11 h-11 rounded-full flex items-center justify-center text-sm font-black transition-all border-2",
-              step === s 
-                ? "bg-primary border-primary text-black shadow-lg shadow-primary/20" 
-                : "bg-white border-slate-100 text-slate-300"
-            )}>
-              {s}
+      {/* Sticky Mobile Bottom Bar */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-slate-100 z-50 flex gap-3 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+         {step === 2 && (
+           <button 
+             onClick={() => setStep(1)}
+             className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 border border-slate-200"
+           >
+             <ArrowLeft className="w-4 h-4" />
+             Voltar
+           </button>
+         )}
+         {step === 1 && (
+           <button 
+             onClick={() => setStep(2)}
+             className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg shadow-black/10"
+           >
+             Próximo
+             <ArrowRight className="w-4 h-4" />
+           </button>
+         )}
+         <button 
+           onClick={handleSave}
+           disabled={isSaving}
+           className="flex-[1.5] yellow-button text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+         >
+           <Save className="w-4 h-4" />
+           {isSaving ? 'Salvando...' : 'Finalizar'}
+         </button>
+      </div>
+
+      <div className="flex items-center justify-center w-full mb-6 sm:mb-10">
+        <div className="flex items-center gap-2 sm:gap-6">
+          {[1, 2].map(s => (
+            <div key={s} className="flex items-center gap-2 sm:gap-3">
+              <div className={cn(
+                "w-8 h-8 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-xs sm:text-sm font-black transition-all border-2",
+                step === s 
+                  ? "bg-primary border-primary text-black shadow-lg shadow-primary/20" 
+                  : "bg-white border-slate-100 text-slate-300"
+              )}>
+                {s}
+              </div>
+              <span className={cn("text-[9px] sm:text-[10px] font-black uppercase tracking-widest", step === s ? "text-slate-900" : "text-slate-300")}>
+                {s === 1 ? 'Geral' : 'Cômodos'}
+              </span>
+              {s === 1 && <div className="w-6 sm:w-16 h-[2px] bg-slate-100" />}
             </div>
-            <span className={cn("text-[10px] font-black uppercase tracking-widest", step === s ? "text-slate-900" : "text-slate-300")}>
-              {s === 1 ? 'Dados Gerais' : 'Cômodos e Itens'}
-            </span>
-            {s === 1 && <div className="w-16 h-[2px] bg-slate-100 mx-2" />}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -413,7 +449,7 @@ export default function NewInspectionPage() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-8"
           >
-            <div className="glass-card p-10 space-y-10 bg-white border-slate-200 shadow-sm">
+            <div className="glass-card p-6 md:p-10 space-y-8 md:space-y-10 bg-white border-slate-200 shadow-sm">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
                 {/* CEP */}
                 <div className="md:col-span-3 space-y-2.5">
@@ -589,7 +625,7 @@ export default function NewInspectionPage() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-6">
+            <div className="hidden sm:flex justify-end pt-6">
               <button 
                 onClick={() => setStep(2)}
                 className="bg-slate-900 text-white px-12 py-4.5 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-black transition-all flex items-center gap-2 shadow-xl shadow-black/10"
@@ -609,13 +645,13 @@ export default function NewInspectionPage() {
           >
             <div className="space-y-8">
               {rooms.map((room, rIndex) => (
-                <div key={room.id} className="glass-card overflow-hidden transition-all border-slate-200 bg-white shadow-sm hover:shadow-md">
+                <div key={room.id} className="glass-card overflow-hidden transition-all border-slate-200 bg-white shadow-sm hover:shadow-md mx-[-8px] sm:mx-0">
                   <div 
                     onClick={() => setRooms(rooms.map(r => r.id === room.id ? {...r, isExpanded: !r.isExpanded} : r))}
-                    className="p-8 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-all"
+                    className="p-5 sm:p-8 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-all"
                   >
-                    <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary font-black border border-primary/20 shadow-sm">
+                    <div className="flex items-center gap-3 sm:gap-5">
+                      <div className="w-10 h-10 sm:w-14 sm:h-14 bg-primary/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-primary font-black border border-primary/20 shadow-sm text-xs sm:text-base">
                         {rIndex + 1}
                       </div>
                       <div>
@@ -623,19 +659,19 @@ export default function NewInspectionPage() {
                           value={room.name}
                           onClick={e => e.stopPropagation()}
                           onChange={e => setRooms(rooms.map(r => r.id === room.id ? {...r, name: e.target.value} : r))}
-                          className="bg-transparent border-none text-xl font-bold text-slate-900 outline-none focus:text-primary transition-all"
+                          className="bg-transparent border-none text-base sm:text-xl font-bold text-slate-900 outline-none focus:text-primary transition-all w-full max-w-[150px] sm:max-w-none"
                         />
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{room.items.length} ITENS OBSERVADOS</p>
+                        <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-0.5 sm:mt-1">{room.items.length} ITENS</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                       <button 
                         onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
-                        className="p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
-                      {room.isExpanded ? <ChevronUp className="w-6 h-6 text-slate-400" /> : <ChevronDown className="w-6 h-6 text-slate-400" />}
+                      {room.isExpanded ? <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400" /> : <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400" />}
                     </div>
                   </div>
 
@@ -647,42 +683,54 @@ export default function NewInspectionPage() {
                         exit={{ height: 0, opacity: 0 }}
                         className="border-t border-slate-100 bg-slate-50/30"
                       >
-                        <div className="p-8 space-y-8">
+                        <div className="p-4 sm:p-8 space-y-6 sm:space-y-8">
                           <div className="space-y-6">
                             {room.items.map((item, iIndex) => (
-                              <div key={item.id} className="space-y-5 p-6 bg-white border border-slate-200 rounded-3xl group relative shadow-sm">
-                                <div className="flex gap-4 items-center">
-                                   <div className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100">
-                                      {iIndex + 1}
+                              <div key={item.id} className="space-y-4 p-4 sm:p-6 bg-white border-b sm:border border-slate-100 sm:border-slate-200 sm:rounded-3xl group relative sm:shadow-sm">
+                                <div className="flex flex-col gap-4">
+                                   <div className="flex items-center gap-3 w-full">
+                                     <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-100 shrink-0">
+                                        {iIndex + 1}
+                                     </div>
+                                     <textarea 
+                                       rows={1}
+                                       value={item.description}
+                                       onChange={e => {
+                                         updateItem(room.id, item.id, 'description', e.target.value);
+                                         e.target.style.height = 'auto';
+                                         e.target.style.height = (e.target.scrollHeight) + 'px';
+                                       }}
+                                       onFocus={e => {
+                                         e.target.style.height = 'auto';
+                                         e.target.style.height = (e.target.scrollHeight) + 'px';
+                                       }}
+                                       placeholder="O que está vistoriando?"
+                                       className="flex-1 bg-transparent border-none text-base font-bold text-slate-900 outline-none placeholder:text-slate-300 resize-none min-h-[28px] leading-relaxed py-1 w-full block"
+                                     />
+                                      <button 
+                                         onClick={() => removeItem(room.id, item.id)}
+                                         className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                       >
+                                         <Trash2 className="w-4 h-4" />
+                                       </button>
                                    </div>
-                                   <input 
-                                     value={item.description}
-                                     onChange={e => updateItem(room.id, item.id, 'description', e.target.value)}
-                                     placeholder="Nome do Item (Ex: Paredes, Piso, Janelas...)"
-                                     className="flex-1 bg-transparent border-none text-base font-bold text-slate-900 outline-none placeholder:text-slate-300"
-                                   />
-                                   <div className="flex items-center gap-1.5">
-                                      {['BOM', 'REG', 'RUIM'].map(s => (
-                                        <button 
-                                          key={s}
-                                          onClick={() => updateItem(room.id, item.id, 'status', s)}
-                                          className={cn(
-                                            "px-4 py-2 rounded-xl text-[9px] font-black transition-all border shadow-sm",
-                                            item.status === s 
-                                              ? "bg-primary text-black border-primary shadow-lg shadow-primary/10" 
-                                              : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
-                                          )}
-                                        >
-                                          {s}
-                                        </button>
-                                      ))}
+                                   
+                                   <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl w-full sm:w-fit border border-slate-100">
+                                       {['BOM', 'REG', 'RUIM'].map(s => (
+                                         <button 
+                                           key={s}
+                                           onClick={() => updateItem(room.id, item.id, 'status', s)}
+                                           className={cn(
+                                             "flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-[9px] font-black transition-all",
+                                             item.status === s 
+                                               ? "bg-white text-black shadow-md border border-slate-100" 
+                                               : "text-slate-400 hover:text-slate-600"
+                                           )}
+                                         >
+                                           {s}
+                                         </button>
+                                       ))}
                                    </div>
-                                   <button 
-                                      onClick={() => removeItem(room.id, item.id)}
-                                      className="p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                                    >
-                                      <Trash2 className="w-4.5 h-4.5" />
-                                    </button>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -706,29 +754,29 @@ export default function NewInspectionPage() {
                                         />
                                       </div>
                                       
-                                      <div className="grid grid-cols-2 gap-3">
-                                        <label className="flex items-center justify-center gap-2 py-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-primary hover:border-primary/30 transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm hover:shadow-md active:scale-95">
-                                          <ImageIcon className="w-4 h-4" />
-                                          Fotos
-                                          <input 
-                                            type="file" multiple accept="image/*" className="hidden"
-                                            onChange={(e) => {
-                                              const files = Array.from(e.target.files || []);
-                                              setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
-                                            }}
-                                          />
-                                        </label>
-                                        <label className="flex items-center justify-center gap-2 py-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-primary hover:border-primary/30 transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm hover:shadow-md active:scale-95">
-                                          <Video className="w-4 h-4" />
-                                          Vídeo
-                                          <input 
-                                            type="file" accept="video/*" className="hidden"
-                                            onChange={(e) => {
-                                              const file = e.target.files?.[0];
-                                              if (file) setVideoFiles(prev => ({ ...prev, [`item-${item.id}`]: [file] }));
-                                            }}
-                                          />
-                                        </label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <label className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-primary transition-all text-[9px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95">
+                                          <ImageIcon className="w-3.5 h-3.5" />
+                                          Galeria
+                                            <input 
+                                              type="file" multiple accept="image/*" className="hidden"
+                                              onChange={(e) => {
+                                                const files = Array.from(e.target.files || []);
+                                                setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
+                                              }}
+                                            />
+                                          </label>
+                                          <label className="flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl hover:bg-black transition-all text-[9px] font-black uppercase tracking-widest cursor-pointer shadow-md active:scale-95">
+                                            <ImageIcon className="w-3.5 h-3.5" />
+                                            Câmera
+                                            <input 
+                                              type="file" multiple accept="image/*" capture="environment" className="hidden"
+                                              onChange={(e) => {
+                                                const files = Array.from(e.target.files || []);
+                                                setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
+                                              }}
+                                            />
+                                          </label>
                                       </div>
                                     </div>
 
@@ -773,22 +821,94 @@ export default function NewInspectionPage() {
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-5 pt-8 border-t border-slate-100">
-                            <label className="flex items-center justify-center gap-3 py-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-primary transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm hover:shadow-md">
-                              <ImageIcon className="w-5 h-5" />
-                              Anexar Fotos do Cômodo
-                              <input 
-                                type="file" 
-                                multiple 
-                                accept="image/*" 
-                                className="hidden" 
-                                onChange={(e) => handlePhotoUpload(room.id, e)}
-                              />
-                            </label>
-                            <button className="flex items-center justify-center gap-3 py-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-primary transition-all text-[10px] font-black uppercase tracking-widest shadow-sm hover:shadow-md">
-                              <Video className="w-5 h-5" />
-                              Link de Vídeo do Cômodo
-                            </button>
+                          <div className="space-y-6 pt-8 border-t border-slate-100">
+                            <div className="space-y-3">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fotos do Cômodo</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <label className="flex items-center justify-center gap-3 py-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-primary transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95">
+                                  <ImageIcon className="w-5 h-5" />
+                                  Galeria
+                                  <input 
+                                    type="file" multiple accept="image/*" className="hidden" 
+                                    onChange={(e) => handlePhotoUpload(room.id, e)}
+                                  />
+                                </label>
+                                <label className="flex items-center justify-center gap-3 py-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-md active:scale-95">
+                                  <ImageIcon className="w-5 h-5" />
+                                  Câmera
+                                  <input 
+                                    type="file" multiple accept="image/*" capture="environment" className="hidden" 
+                                    onChange={(e) => handlePhotoUpload(room.id, e)}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vídeo do Cômodo</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <label className="flex items-center justify-center gap-3 py-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-primary transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95">
+                                  <Video className="w-5 h-5" />
+                                  Galeria
+                                  <input 
+                                    type="file" accept="video/*" className="hidden" 
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) setVideoFiles(prev => ({ ...prev, [room.id]: [file] }));
+                                    }}
+                                  />
+                                </label>
+                                <label className="flex items-center justify-center gap-3 py-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-md active:scale-95">
+                                  <Video className="w-5 h-5" />
+                                  Câmera
+                                  <input 
+                                    type="file" accept="video/*" capture="environment" className="hidden" 
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) setVideoFiles(prev => ({ ...prev, [room.id]: [file] }));
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+
+                            {/* Room Previews */}
+                            <div className="flex flex-wrap gap-2.5">
+                              {photoFiles[room.id]?.map((file, idx) => (
+                                <div key={idx} className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm">
+                                  <img 
+                                    src={URL.createObjectURL(file)} 
+                                    className="w-full h-full object-cover" 
+                                    onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
+                                  />
+                                  <button 
+                                    onClick={() => {
+                                      const newFiles = [...photoFiles[room.id]];
+                                      newFiles.splice(idx, 1);
+                                      setPhotoFiles(prev => ({ ...prev, [room.id]: newFiles }));
+                                    }}
+                                    className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              {videoFiles[room.id]?.map((file, idx) => (
+                                <div key={idx} className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center relative group">
+                                  <Video className="w-6 h-6 text-slate-400" />
+                                  <button 
+                                    onClick={() => setVideoFiles(prev => {
+                                      const next = {...prev};
+                                      delete next[room.id];
+                                      return next;
+                                    })}
+                                    className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                           </div>
                       </motion.div>

@@ -99,26 +99,42 @@ export class UserController {
       const localUsers = await prisma.user.findMany({ 
         where: { 
           tenantId: req.tenantId,
-          deletedAt: null 
+          deletedAt: null,
+          ...(role && {
+            role: { contains: role.toString() }
+          })
         } 
       });
 
       // Merge Asaas and Local
       const formatted = customers.map((c: any) => {
-        const local = localUsers.find(u => u.asaasId === c.id);
+        const local = localUsers.find(u => 
+          u.asaasId?.toUpperCase() === c.id?.toUpperCase()
+        );
+        
+        // Normalize role (handle single or multi-role strings)
+        let roleRaw = local?.role || c.groupName || 'TENANT';
+        const normalizedRoles = roleRaw.split(',').map(r => {
+          const trimmed = r.trim();
+          if (trimmed === 'Proprietário') return 'LANDLORD';
+          if (trimmed === 'Inquilino') return 'TENANT';
+          return trimmed;
+        });
+        const role = Array.from(new Set(normalizedRoles)).join(',');
+        
         return {
-          id: c.id, // Primary UI ID is Asaas ID for synced users
+          id: c.id, 
           name: local?.name || c.name,
           email: c.email || 'N/A',
           phone: local?.phone || c.mobilePhone || c.phone || 'N/A',
           cpfCnpj: c.cpfCnpj || 'N/A',
-          role: local?.role || c.groupName || 'Inquilino',
+          role: role,
           status: 'Ativo',
           isLocalOverride: !!local
         };
       });
 
-      // Add Local-only users (like manually created landlords)
+      // Add Local-only users
       if (offset === 0) {
         const localOnly = localUsers.filter(u => !u.asaasId).map(u => ({
           id: u.id,
@@ -142,7 +158,7 @@ export class UserController {
       
       res.json({ 
         data: formatted, 
-        pagination: { total: totalCount + (offset === 0 ? 0 : 0), offset: Number(offset), limit: Number(limit) }
+        pagination: { total: totalCount, offset: Number(offset), limit: Number(limit) }
       });
     } catch (error) {
       console.error('UserController.listAll error:', error);
@@ -184,17 +200,28 @@ export class UserController {
         }
       });
 
-      // 2. Check for email collision if email is being changed or user is being created
+      // 2. Check for email collision
       if (data.email) {
         const emailCollision = await prisma.user.findFirst({
           where: {
             email: data.email,
-            id: { not: existing?.id } // Allow own email
+            id: { not: existing?.id }
           }
         });
 
         if (emailCollision) {
-          return res.status(400).json({ error: 'Este e-mail já está em uso por outro usuário.' });
+          // Check if names share at least one significant word (to identify same person)
+          const name1Words = emailCollision.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const name2Words = name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const isSamePerson = name1Words.some(w => name2Words.includes(w));
+          
+          if (isSamePerson) {
+            // Same person! To avoid DB Unique constraint error, we simply REMOVE the email from the update data
+            // but allow the rest of the update (roles, permissions, etc.) to proceed.
+            delete data.email;
+          } else {
+            return res.status(400).json({ error: 'Este e-mail já está em uso por outro usuário.' });
+          }
         }
       }
 

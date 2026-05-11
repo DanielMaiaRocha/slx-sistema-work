@@ -93,7 +93,7 @@ export default function ViewInspectionPage() {
   const inspector = JSON.parse(inspection.inspectorData || '{}');
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 md:space-y-12 pb-32 px-4 md:px-0 pt-12 md:pt-16">
+    <div className="w-full py-4 sm:py-8 space-y-6 sm:space-y-8 pb-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
           <Link href="/dashboard/inspections" className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-sm mb-4">

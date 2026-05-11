@@ -41,10 +41,18 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, logout } = useAuth();
   const { branding } = useBranding();
 
+  const hasRole = (r: string) => {
+    if (!user?.role) return false;
+    return user.role.split(',').includes(r);
+  };
+
   const filteredItems = menuItems.filter(item => {
-    if (user?.role === 'ADMIN' || user?.role === 'OWNER') return true;
-    if (item.roles && !item.roles.includes(user?.role)) return false;
-    if (item.permission && user?.role === 'TENANT') {
+    const isSuperUser = hasRole('ADMIN') || hasRole('OWNER');
+    if (isSuperUser) return true;
+    
+    if (item.roles && !item.roles.some(r => hasRole(r))) return false;
+    
+    if (item.permission && (hasRole('TENANT') || hasRole('LANDLORD'))) {
       return user?.permissions?.[item.permission];
     }
     return true;

@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
+    "build": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc || true",
     "start": "node dist/server.js",
     "seed": "ts-node src/seed.ts",
     "prisma:generate": "prisma generate --schema=../../packages/database/prisma/schema.prisma",

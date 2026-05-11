@@ -25,7 +25,7 @@ import {
   ChevronRight,
   Eye,
   Check,
-  RefreshCw
+  
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';

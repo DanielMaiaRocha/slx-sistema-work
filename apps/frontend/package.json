@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && cp -r public .next/standalone/apps/frontend/public && cp -r .next/static .next/standalone/apps/frontend/.next/static",
-    "start": "HOSTNAME=0.0.0.0 node .next/standalone/apps/frontend/server.js",
+    "build": "next build && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/",
+    "start": "HOSTNAME=0.0.0.0 node .next/standalone/server.js",
     "build:frontend": "npm run build",
     "start:frontend": "npm run start",
     "lint": "eslint"

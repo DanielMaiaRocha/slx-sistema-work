@@ -9,8 +9,7 @@
     "start": "node dist/server.js",
     "seed": "ts-node src/seed.ts",
     "prisma:generate": "prisma generate --schema=../../packages/database/prisma/schema.prisma",
-    "prisma:deploy": "prisma migrate deploy --schema=../../packages/database/prisma/schema.prisma",
-    "postinstall": "prisma generate --schema=../../packages/database/prisma/schema.prisma"
+    "prisma:deploy": "prisma migrate deploy --schema=../../packages/database/prisma/schema.prisma"
   },
   "keywords": [],
   "author": "",

@@ -95,7 +95,7 @@ export default function UsersPage() {
     try {
       await fetchApi('/users', {
         method: 'POST',
-        body: newUserForm
+        body: JSON.stringify(newUserForm)
       });
       toast.success('Usuário criado com sucesso!');
       setIsCreateModalOpen(false);

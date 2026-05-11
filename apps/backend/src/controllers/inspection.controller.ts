@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { PDFService } from '../services/pdf.service';
-import { TenantService } from '../services/tenant.service';
 
 export class InspectionController {
   static async listAll(req: Request, res: Response) {

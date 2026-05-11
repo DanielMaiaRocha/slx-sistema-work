@@ -6,8 +6,8 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/frontend/package.json ./apps/frontend/
-# Instala todas as dependências (incluindo workspaces)
-RUN npm ci
+# Usamos install em vez de ci para evitar erros de sincronia do lockfile no monorepo
+RUN npm install
 
 # 2. Reconstruir o código-fonte apenas quando necessário
 FROM base AS builder

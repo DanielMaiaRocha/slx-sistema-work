@@ -1,15 +1,15 @@
 # apps/backend/Dockerfile
 FROM node:22-slim AS base
 
-# Instalar dependências necessárias para o Prisma e Puppeteer (se usado)
-RUN apt-get update && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Instalar dependências necessárias para o Prisma
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/database/package.json ./packages/database/
-RUN npm ci
+RUN npm install
 
 FROM base AS builder
 WORKDIR /app

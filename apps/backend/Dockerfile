@@ -8,8 +8,8 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/backend/package.json ./apps/backend/
-COPY packages/database/package.json ./packages/database/
-RUN npm install
+COPY apps/frontend/package.json ./apps/frontend/
+RUN npm install --ignore-scripts
 
 FROM base AS builder
 WORKDIR /app

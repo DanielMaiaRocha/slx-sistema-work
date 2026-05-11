@@ -6,8 +6,10 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/frontend/package.json ./apps/frontend/
-# Usamos install em vez de ci para evitar erros de sincronia do lockfile no monorepo
-RUN npm install
+COPY apps/backend/package.json ./apps/backend/
+COPY packages ./packages/
+# Ignoramos scripts para evitar falha no postinstall (prisma generate)
+RUN npm install --ignore-scripts
 
 # 2. Reconstruir o código-fonte apenas quando necessário
 FROM base AS builder

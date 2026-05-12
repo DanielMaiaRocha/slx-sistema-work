@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   Home, 
   FileText, 
@@ -19,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function LandlordLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(false);
@@ -98,11 +100,7 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
         <div className="p-8 border-t border-white/5 space-y-4">
           <button 
             onClick={() => {
-              Cookies.remove('token');
-              Cookies.remove('user_role');
-              Cookies.remove('user_name');
-              Cookies.remove('tenant_logo');
-              router.push('/login/inquilinos');
+              logout();
             }}
             className="w-full py-4.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-2xl font-black uppercase tracking-widest text-[9px] transition-all flex items-center justify-center gap-3"
           >
@@ -164,14 +162,7 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
                         <button
                           onClick={() => {
                             setIsProfileMenuOpen(false);
-                            Cookies.remove('token', { path: '/' });
-                            Cookies.remove('user', { path: '/' });
-                            Cookies.remove('user_role', { path: '/' });
-                            Cookies.remove('user_name', { path: '/' });
-                            Cookies.remove('tenant_logo', { path: '/' });
-                            localStorage.removeItem('token');
-                            localStorage.removeItem('user');
-                            router.push('/login/inquilinos');
+                            logout();
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors font-bold text-xs uppercase tracking-widest"
                         >

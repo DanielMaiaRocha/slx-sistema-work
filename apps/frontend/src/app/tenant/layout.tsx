@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   CreditCard, 
   FileText, 
@@ -19,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [hasNotifications, setHasNotifications] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -190,14 +192,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
                         <button
                           onClick={() => {
                             setIsProfileMenuOpen(false);
-                            Cookies.remove('token', { path: '/' });
-                            Cookies.remove('user', { path: '/' });
-                            Cookies.remove('user_role', { path: '/' });
-                            Cookies.remove('user_name', { path: '/' });
-                            Cookies.remove('tenant_logo', { path: '/' });
-                            localStorage.removeItem('token');
-                            localStorage.removeItem('user');
-                            router.push('/login/inquilinos');
+                            logout();
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors font-bold text-xs uppercase tracking-widest"
                         >

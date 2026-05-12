@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import ConfirmModal from '@/components/ConfirmModal';
+import ImagePreviewModal from '@/components/ImagePreviewModal';
 
 interface Room {
   id: string;
@@ -65,6 +66,7 @@ export default function NewInspectionPage() {
     message: '',
     onConfirm: () => {},
   });
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const propertyTypes = [
     { value: 'RESIDENTIAL', label: 'Residencial' },
@@ -788,12 +790,14 @@ export default function NewInspectionPage() {
                                             <div key={`${file.name}-${idx}`} className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm">
                                               <img 
                                                 src={URL.createObjectURL(file)} 
-                                                className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-110 cursor-zoom-in" 
                                                 onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
+                                                onClick={() => setPreviewImage(URL.createObjectURL(file))}
                                               />
                                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                 <button 
-                                                  onClick={() => {
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
                                                     const newFiles = [...photoFiles[`item-${item.id}`]];
                                                     newFiles.splice(idx, 1);
                                                     setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: newFiles }));
@@ -875,19 +879,20 @@ export default function NewInspectionPage() {
                             {/* Room Previews */}
                             <div className="flex flex-wrap gap-2.5">
                               {photoFiles[room.id]?.map((file, idx) => (
-                                <div key={idx} className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm">
+                                <div key={idx} className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in" onClick={() => setPreviewImage(URL.createObjectURL(file))}>
                                   <img 
                                     src={URL.createObjectURL(file)} 
-                                    className="w-full h-full object-cover" 
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
                                     onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
                                   />
                                   <button 
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       const newFiles = [...photoFiles[room.id]];
                                       newFiles.splice(idx, 1);
                                       setPhotoFiles(prev => ({ ...prev, [room.id]: newFiles }));
                                     }}
-                                    className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white"
+                                    className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -944,6 +949,10 @@ export default function NewInspectionPage() {
       <ConfirmModal 
         {...confirmConfig}
         onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
+      <ImagePreviewModal 
+        url={previewImage} 
+        onClose={() => setPreviewImage(null)} 
       />
     </div>
   );

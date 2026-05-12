@@ -8,11 +8,19 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = Cookies.get('token');
-    const storedUser = Cookies.get('user');
+    const token = Cookies.get('token') || localStorage.getItem('token');
+    const storedUser = Cookies.get('user') || localStorage.getItem('user');
 
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        // Sync back to both if only one was present
+        if (!Cookies.get('token')) Cookies.set('token', token, { expires: 7, path: '/', sameSite: 'lax' });
+        if (!localStorage.getItem('token')) localStorage.setItem('token', token);
+      } catch (e) {
+        console.error('Failed to parse stored user', e);
+      }
     }
     setLoading(false);
   }, []);
@@ -34,8 +42,14 @@ export const useAuth = () => {
       }
 
       const { token, user } = await response.json();
-      Cookies.set('token', token, { expires: 7 });
-      Cookies.set('user', JSON.stringify(user), { expires: 7 });
+      
+      const cookieOptions = { expires: 7, path: '/', sameSite: 'lax' as const };
+      Cookies.set('token', token, cookieOptions);
+      Cookies.set('user', JSON.stringify(user), cookieOptions);
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
       setUser(user);
       return { success: true };
     } catch (error: any) {
@@ -44,10 +58,11 @@ export const useAuth = () => {
   };
 
   const logout = () => {
-    Cookies.remove('token');
-    Cookies.remove('user');
+    Cookies.remove('token', { path: '/' });
+    Cookies.remove('user', { path: '/' });
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
-    // Hard redirect to clear any state and ensure user is sent to login
     window.location.href = '/';
   };
 

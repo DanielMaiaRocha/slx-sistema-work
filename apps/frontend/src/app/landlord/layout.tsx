@@ -14,11 +14,13 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LandlordLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(false);
 
   useEffect(() => {
@@ -129,17 +131,58 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
                 </h2>
               </div>
            </div>
-           <div className="flex items-center gap-3">
-              <button 
-                onClick={() => {
-                  Cookies.remove('token');
-                  Cookies.remove('user_role');
-                  router.push('/login/inquilinos');
-                }}
-                className="w-11 h-11 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100"
-              >
-                 <LogOut className="w-5 h-5" />
-              </button>
+           <div className="flex items-center gap-3 relative">
+              <div className="relative">
+                <button 
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  className="w-11 h-11 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 border border-slate-200 overflow-hidden active:scale-95 transition-transform"
+                >
+                   <UserIcon className="w-6 h-6" />
+                </button>
+
+                <AnimatePresence>
+                  {isProfileMenuOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setIsProfileMenuOpen(false)} 
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-3 w-48 bg-white rounded-[1.5rem] shadow-2xl border border-slate-100 p-2 z-20"
+                      >
+                        <div className="px-4 py-3 border-b border-slate-50 mb-1">
+                          <p className="text-xs font-black text-slate-900 truncate uppercase tracking-tighter">
+                            {userName}
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            Área do Proprietário
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            Cookies.remove('token', { path: '/' });
+                            Cookies.remove('user', { path: '/' });
+                            Cookies.remove('user_role', { path: '/' });
+                            Cookies.remove('user_name', { path: '/' });
+                            Cookies.remove('tenant_logo', { path: '/' });
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('user');
+                            router.push('/login/inquilinos');
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors font-bold text-xs uppercase tracking-widest"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Sair do Portal
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
            </div>
         </header>
 

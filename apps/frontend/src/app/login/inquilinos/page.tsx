@@ -43,11 +43,18 @@ export default function TenantLoginPage() {
         }),
       });
 
-      Cookies.set('token', response.token, { expires: 7 });
-      Cookies.set('user_role', response.user.role, { expires: 7 });
-      Cookies.set('user_name', response.user.name, { expires: 7 });
+      const cookieOptions = { expires: 7, path: '/', sameSite: 'lax' as const };
+      Cookies.set('token', response.token, cookieOptions);
+      Cookies.set('user', JSON.stringify(response.user), cookieOptions);
+      
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+
+      // Also set legacy individual cookies if needed for other parts of the app
+      Cookies.set('user_role', response.user.role, cookieOptions);
+      Cookies.set('user_name', response.user.name, cookieOptions);
       if (response.user.tenant?.logoUrl) {
-        Cookies.set('tenant_logo', response.user.tenant.logoUrl, { expires: 7 });
+        Cookies.set('tenant_logo', response.user.tenant.logoUrl, cookieOptions);
       }
       
       toast.success('Login realizado com sucesso!');

@@ -279,15 +279,18 @@ export default function SettingsPage() {
                               <Plus className="w-8 h-8 text-white" />
                               <input 
                                 type="file" className="hidden" accept="image/*"
-                                onChange={async (e) => {
+                                onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (!file) return;
-                                  const formData = new FormData();
-                                  formData.append('logo', file);
-                                  try {
-                                    const res = await fetchApi('/settings/upload-logo', { method: 'POST', body: formData, headers: {} });
-                                    setSettings({ ...settings, logoUrl: res.url });
-                                  } catch (err: any) { toast.error(err.message); }
+                                  if (file.size > 1024 * 1024) {
+                                    toast.error('Logo muito grande. Use uma imagem menor que 1MB.');
+                                    return;
+                                  }
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setSettings({ ...settings, logoUrl: reader.result as string });
+                                  };
+                                  reader.readAsDataURL(file);
                                 }}
                               />
                             </label>

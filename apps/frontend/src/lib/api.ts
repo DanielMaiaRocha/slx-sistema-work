@@ -1,6 +1,6 @@
 import Cookies from 'js-cookie';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://slx-sistema-work-production.up.railway.app/api';
 
 export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   const token = Cookies.get('token');
@@ -25,7 +25,8 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
-    body
+    body,
+    credentials: 'include', // Send cookies with requests
   });
 
   if (!response.ok) {

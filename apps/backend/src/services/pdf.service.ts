@@ -16,6 +16,17 @@ export class PDFService {
       const tenant = JSON.parse(inspection.tenantData || '{}');
       const inspector = JSON.parse(inspection.inspectorData || '{}');
 
+      // Get the API URL - use production URL as default
+      const apiUrl = process.env.API_URL || 'https://slx-sistema-work-production.up.railway.app';
+
+      // Helper function to ensure full URLs for images
+      const getFullPhotoUrl = (photoUrl: string) => {
+        if (photoUrl.startsWith('http')) {
+          return photoUrl;
+        }
+        return `${apiUrl}${photoUrl.startsWith('/') ? photoUrl : '/' + photoUrl}`;
+      };
+
       // Simple HTML template for the PDF
       const htmlContent = `
         <!DOCTYPE html>
@@ -120,7 +131,7 @@ export class PDFService {
                         <div class="photo-grid">
                           ${item.photos.map((photo: any) => `
                             <div class="photo-item">
-                              <img src="${photo.url.startsWith('http') ? photo.url : (process.env.API_URL || 'http://localhost:3001') + photo.url}" class="photo-img">
+                              <img src="${getFullPhotoUrl(photo.url)}" class="photo-img" onerror="this.style.display='none'">
                             </div>
                           `).join('')}
                         </div>
@@ -132,7 +143,7 @@ export class PDFService {
                   <div class="photo-grid">
                     ${room.photos.map((photo: any) => `
                       <div class="photo-item">
-                        <img src="${photo.url}" class="photo-img">
+                        <img src="${getFullPhotoUrl(photo.url)}" class="photo-img" onerror="this.style.display='none'">
                       </div>
                     `).join('')}
                   </div>
@@ -185,8 +196,9 @@ export class PDFService {
 
       await browser.close();
       
-      return `${process.env.API_URL || 'http://localhost:3001'}/uploads/${fileName}`;
+      return `${apiUrl}/uploads/${fileName}`;
     } catch (error) {
+      console.error('PDFService.generateInspectionPDF error:', error);
       await browser.close();
       throw error;
     }

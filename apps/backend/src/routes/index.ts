@@ -16,6 +16,11 @@ import { Role } from '@prisma/client';
 
 const router = Router();
 
+// Get API URL from environment or use production URL
+const getApiUrl = () => {
+  return process.env.API_URL || 'https://slx-sistema-work-production.up.railway.app';
+};
+
 // Public routes (but still require tenant context for white-label/isolation)
 router.post('/auth/register', tenantMiddleware, AuthController.register);
 router.post('/auth/login', tenantMiddleware, AuthController.login);
@@ -43,7 +48,7 @@ router.get('/settings/branding', tenantMiddleware, SettingsController.getBrandin
 router.put('/settings/branding', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), SettingsController.updateBranding);
 router.post('/settings/upload-logo', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), upload.single('logo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  const url = `${process.env.API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+  const url = `${getApiUrl()}/uploads/${req.file.filename}`;
   res.json({ url });
 });
 
@@ -82,7 +87,7 @@ router.delete('/inspections/items/:itemId', tenantMiddleware, authMiddleware(), 
 router.post('/inspections/rooms/:roomId/photos', tenantMiddleware, authMiddleware(), upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhuma foto enviada' });
-    const url = `${process.env.API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+    const url = `${getApiUrl()}/uploads/${req.file.filename}`;
     
     const { itemId } = req.body;
     
@@ -110,7 +115,7 @@ router.post('/inspections/rooms/:roomId/videos', tenantMiddleware, authMiddlewar
     let url = req.body.url;
 
     if (req.file) {
-      url = `${process.env.API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+      url = `${getApiUrl()}/uploads/${req.file.filename}`;
     }
 
     if (!url) return res.status(400).json({ error: 'Nenhum vídeo ou link enviado' });
@@ -150,7 +155,7 @@ router.delete('/documents/:id', tenantMiddleware, authMiddleware([Role.ADMIN, Ro
 
 router.post('/upload', tenantMiddleware, authMiddleware(), upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  const url = `${process.env.API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+  const url = `${getApiUrl()}/uploads/${req.file.filename}`;
   res.json({ url, name: req.file.originalname });
 });
 

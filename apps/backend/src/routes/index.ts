@@ -16,18 +16,45 @@ import { Role } from '@prisma/client';
 
 const router = Router();
 
-// Get API URL from environment or use production URL
-const getApiUrl = () => {
-  return process.env.API_URL || 'https://slx-sistema-work-production.up.railway.app';
-};
+// Helper: save an uploaded file (from multer memoryStorage) to the Media table
+// Returns the relative URL path: /api/media/:id
+async function saveFileToMedia(file: Express.Multer.File): Promise<string> {
+  const media = await prisma.media.create({
+    data: {
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      data: file.buffer,
+      size: file.size,
+    },
+  });
+  return `/api/media/${media.id}`;
+}
 
-// Public routes (but still require tenant context for white-label/isolation)
+// ─── Serve media from DB ─────────────────────────────────────────────────────
+router.get('/media/:id', async (req: Request, res: Response) => {
+  try {
+    const media = await prisma.media.findUnique({ where: { id: req.params.id as string } });
+    if (!media) return res.status(404).json({ error: 'Arquivo não encontrado' });
+
+    res.set({
+      'Content-Type': media.mimeType,
+      'Content-Length': String(media.size),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+    res.send(Buffer.from(media.data));
+  } catch (error) {
+    console.error('Media serve error:', error);
+    res.status(500).json({ error: 'Erro ao servir arquivo' });
+  }
+});
+
+// ─── Public routes ───────────────────────────────────────────────────────────
 router.post('/auth/register', tenantMiddleware, AuthController.register);
 router.post('/auth/login', tenantMiddleware, AuthController.login);
 router.get('/auth/verify', AuthController.verifyEmail);
 router.get('/public/inspections/:id', tenantMiddleware, InspectionController.getById);
 
-// Tenant (Inquilino) Area Routes
+// ─── Tenant (Inquilino) Area Routes ──────────────────────────────────────────
 import { TenantAuthController } from '../controllers/tenant-auth.controller';
 import { TenantController } from '../controllers/tenant.controller';
 
@@ -38,21 +65,26 @@ router.post('/auth/set-password', tenantMiddleware, TenantAuthController.setPass
 router.get('/tenant/bills', tenantMiddleware, authMiddleware([Role.TENANT]), TenantController.getBills);
 router.get('/tenant/contract', tenantMiddleware, authMiddleware([Role.TENANT]), TenantController.getContract);
 
-// Owner (Proprietário) Area Routes
+// ─── Owner (Proprietário) Area Routes ────────────────────────────────────────
 import { LandlordController } from '../controllers/landlord.controller';
 router.get('/landlord/properties', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.LANDLORD]), LandlordController.getProperties);
 router.get('/landlord/documents', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.LANDLORD]), LandlordController.getDocuments);
 
-// Settings / Branding
+// ─── Settings / Branding ─────────────────────────────────────────────────────
 router.get('/settings/branding', tenantMiddleware, SettingsController.getBranding);
 router.put('/settings/branding', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), SettingsController.updateBranding);
-router.post('/settings/upload-logo', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), upload.single('logo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  const url = `${getApiUrl()}/uploads/${req.file.filename}`;
-  res.json({ url });
+router.post('/settings/upload-logo', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), upload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    const url = await saveFileToMedia(req.file);
+    res.json({ url });
+  } catch (error: any) {
+    console.error('Logo upload error:', error);
+    res.status(500).json({ error: 'Erro ao salvar logo' });
+  }
 });
 
-// Real Data routes
+// ─── Dashboard / Users / Financial ───────────────────────────────────────────
 router.get('/dashboard/stats', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT]), DashboardController.getStats);
 router.get('/financial/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'financial_view'), FinancialController.listAll);
 router.get('/users/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_view'), UserController.listAll);
@@ -66,10 +98,10 @@ router.put('/users/:id', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNE
 router.delete('/users/:id', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.delete);
 router.put('/users/customer/:asaasId', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_edit'), UserController.updateCustomer);
 
-// Sync route
+// ─── Sync ────────────────────────────────────────────────────────────────────
 router.post('/sync', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'asaas_sync'), SyncController.triggerSync);
 
-// Inspection routes
+// ─── Inspection routes ───────────────────────────────────────────────────────
 router.get('/inspections/all', tenantMiddleware, authMiddleware(), InspectionController.listAll);
 router.get('/inspections/:id', tenantMiddleware, authMiddleware(), InspectionController.getById);
 router.get('/inspections/:id/pdf', tenantMiddleware, authMiddleware(), InspectionController.generatePdf);
@@ -85,11 +117,11 @@ router.post('/inspections/rooms/:roomId/items', tenantMiddleware, authMiddleware
 router.put('/inspections/items/:itemId', tenantMiddleware, authMiddleware(), InspectionController.updateItem);
 router.delete('/inspections/items/:itemId', tenantMiddleware, authMiddleware(), InspectionController.deleteItem);
 
-// Media
+// ─── Inspection Media (photos/videos) ────────────────────────────────────────
 router.post('/inspections/rooms/:roomId/photos', tenantMiddleware, authMiddleware(), upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhuma foto enviada' });
-    const url = `${getApiUrl()}/uploads/${req.file.filename}`;
+    const url = await saveFileToMedia(req.file);
     
     const { itemId } = req.body;
     
@@ -117,7 +149,7 @@ router.post('/inspections/rooms/:roomId/videos', tenantMiddleware, authMiddlewar
     let url = req.body.url;
 
     if (req.file) {
-      url = `${getApiUrl()}/uploads/${req.file.filename}`;
+      url = await saveFileToMedia(req.file);
     }
 
     if (!url) return res.status(400).json({ error: 'Nenhum vídeo ou link enviado' });
@@ -136,17 +168,14 @@ router.post('/inspections/rooms/:roomId/videos', tenantMiddleware, authMiddlewar
   }
 });
 
-// Protected routes
+// ─── Protected routes ────────────────────────────────────────────────────────
 router.get('/financial/me', tenantMiddleware, authMiddleware(), FinancialController.listMyFinancials);
 router.get('/financial/invoice/:recordId', tenantMiddleware, authMiddleware(), FinancialController.getInvoiceData);
 
 router.get('/documents/me', tenantMiddleware, authMiddleware(), DocumentController.listMyDocuments);
 router.post('/documents/upload', tenantMiddleware, authMiddleware(), DocumentController.upload);
 
-// Admin routes
-// router.get('/admin/dashboard', tenantMiddleware, authMiddleware([Role.ADMIN]), AdminController.dashboard);
-
-// Document routes
+// ─── Document routes ─────────────────────────────────────────────────────────
 router.get('/documents/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), DocumentController.listAll);
 router.get('/documents/me', tenantMiddleware, authMiddleware(), DocumentController.listMyDocuments);
 router.get('/documents/user/:userId', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), DocumentController.listUserDocuments);
@@ -155,10 +184,16 @@ router.put('/documents/:id', tenantMiddleware, authMiddleware([Role.ADMIN, Role.
 router.post('/documents/reparse/:userId', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), DocumentController.reparseUserContracts);
 router.delete('/documents/:id', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), DocumentController.delete);
 
-router.post('/upload', tenantMiddleware, authMiddleware(), upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  const url = `${getApiUrl()}/uploads/${req.file.filename}`;
-  res.json({ url, name: req.file.originalname });
+// ─── Generic file upload ─────────────────────────────────────────────────────
+router.post('/upload', tenantMiddleware, authMiddleware(), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    const url = await saveFileToMedia(req.file);
+    res.json({ url, name: req.file.originalname });
+  } catch (error: any) {
+    console.error('Generic upload error:', error);
+    res.status(500).json({ error: 'Erro ao salvar arquivo' });
+  }
 });
 
 export default router;

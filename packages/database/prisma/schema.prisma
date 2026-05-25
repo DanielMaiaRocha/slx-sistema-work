@@ -270,3 +270,12 @@ model Log {
   @@index([tenantId])
   @@index([userId])
 }
+
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  mimeType  String
+  data      Bytes
+  size      Int
+  createdAt DateTime @default(now())
+}

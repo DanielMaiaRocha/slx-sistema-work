@@ -1,15 +1,19 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
-import fs from 'fs';
 import os from 'os';
-import axios from 'axios';
+import prisma from '../config/prisma';
 
 export class PDFService {
-  static deleteInspectionPDF(inspectionId: string) {
+  // Delete a cached PDF from the Media table
+  static async deleteInspectionPDF(inspectionId: string) {
     try {
-      const filePath = path.join(__dirname, '../../public/uploads', `vistoria_${inspectionId}.pdf`);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Delete any media that was stored as the PDF for this inspection
+      const pdfFilename = `vistoria_${inspectionId}.pdf`;
+      const existing = await prisma.media.findFirst({
+        where: { filename: pdfFilename },
+      });
+      if (existing) {
+        await prisma.media.delete({ where: { id: existing.id } });
         console.log(`Deleted cached PDF for inspection ${inspectionId}`);
       }
     } catch (err) {
@@ -17,19 +21,59 @@ export class PDFService {
     }
   }
 
-  static async generateInspectionPDF(inspection: any, branding: any) {
-    const fileName = `vistoria_${inspection.id}.pdf`;
-    const filePath = path.join(__dirname, '../../public/uploads', fileName);
+  // Resolve a URL to base64 data: either from the Media table or via network
+  private static async resolveToBase64(photoUrl: string): Promise<string> {
+    const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    if (!photoUrl) return placeholder;
 
-    const apiUrl = process.env.API_URL || 'https://slx-sistema-work-production.up.railway.app';
-
-    // 1. If the file already exists, return the URL immediately!
-    if (fs.existsSync(filePath)) {
-      console.log(`PDF already exists for inspection ${inspection.id}, returning cached path.`);
-      return `${apiUrl}/uploads/${fileName}`;
+    // If the URL points to our media endpoint, read directly from the DB
+    const mediaMatch = photoUrl.match(/\/api\/media\/([a-zA-Z0-9_-]+)/);
+    if (mediaMatch) {
+      try {
+        const media = await prisma.media.findUnique({ where: { id: mediaMatch[1] } });
+        if (media) {
+          const base64 = Buffer.from(media.data).toString('base64');
+          return `data:${media.mimeType};base64,${base64}`;
+        }
+      } catch (err) {
+        console.warn(`Failed to read media ${mediaMatch[1]} from DB:`, err);
+      }
+      return placeholder;
     }
 
-    // 2. Collect and pre-fetch all image URLs to Base64 in parallel
+    // Legacy: try to fetch via HTTP (for old data that still has full URLs)
+    if (photoUrl.startsWith('http')) {
+      try {
+        const axios = (await import('axios')).default;
+        const response = await axios.get(photoUrl, {
+          responseType: 'arraybuffer',
+          timeout: 5000,
+        });
+        const buffer = Buffer.from(response.data, 'binary');
+        const contentType = response.headers['content-type'] || 'image/jpeg';
+        return `data:${contentType};base64,${buffer.toString('base64')}`;
+      } catch (error: any) {
+        console.warn(`Failed to fetch remote image: ${photoUrl}. Error: ${error.message}`);
+        return placeholder;
+      }
+    }
+
+    return placeholder;
+  }
+
+  static async generateInspectionPDF(inspection: any, branding: any) {
+    const pdfFilename = `vistoria_${inspection.id}.pdf`;
+
+    // 1. Check if a cached PDF already exists in the Media table
+    const existingPdf = await prisma.media.findFirst({
+      where: { filename: pdfFilename },
+    });
+    if (existingPdf) {
+      console.log(`PDF already exists for inspection ${inspection.id}, returning cached.`);
+      return `/api/media/${existingPdf.id}`;
+    }
+
+    // 2. Collect all image URLs and pre-fetch to Base64 in parallel
     const urlsToFetch: string[] = [];
     if (branding?.logoUrl) urlsToFetch.push(branding.logoUrl);
     
@@ -55,59 +99,11 @@ export class PDFService {
     const uniqueUrls = Array.from(new Set(urlsToFetch));
     const urlMap: Record<string, string> = {};
 
-    const fetchPromises = uniqueUrls.map(async (photoUrl) => {
-      if (!photoUrl) return;
-
-      // Try local file first
-      try {
-        const isLocalUpload = photoUrl.startsWith('/uploads/') || photoUrl.startsWith('uploads/') || photoUrl.includes('/uploads/') || !photoUrl.startsWith('http');
-        const filename = path.basename(photoUrl);
-        const localPath = path.join(__dirname, '../../public/uploads', filename);
-
-        if (fs.existsSync(localPath)) {
-          const fileBuffer = fs.readFileSync(localPath);
-          const extension = path.extname(filename).substring(1).toLowerCase() || 'png';
-          const base64 = fileBuffer.toString('base64');
-          urlMap[photoUrl] = `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${base64}`;
-          return;
-        }
-      } catch (err) {
-        console.error('Error reading local file for pre-fetch:', err);
-      }
-
-      // If not local, and it starts with http, fetch it over the network
-      if (photoUrl.startsWith('http')) {
-        try {
-          const response = await axios.get(photoUrl, {
-            responseType: 'arraybuffer',
-            timeout: 3000,
-          });
-          const buffer = Buffer.from(response.data, 'binary');
-          const contentType = response.headers['content-type'] || 'image/jpeg';
-          urlMap[photoUrl] = `data:${contentType};base64,${buffer.toString('base64')}`;
-        } catch (error: any) {
-          console.warn(`Failed to fetch remote image: ${photoUrl}. Error: ${error.message}`);
-          urlMap[photoUrl] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-        }
-      } else {
-        const fullUrl = `${apiUrl}${photoUrl.startsWith('/') ? photoUrl : '/' + photoUrl}`;
-        try {
-          const response = await axios.get(fullUrl, {
-            responseType: 'arraybuffer',
-            timeout: 3000,
-          });
-          const buffer = Buffer.from(response.data, 'binary');
-          const contentType = response.headers['content-type'] || 'image/jpeg';
-          urlMap[photoUrl] = `data:${contentType};base64,${buffer.toString('base64')}`;
-        } catch (error: any) {
-          console.warn(`Failed to fetch remote fallback image: ${fullUrl}. Error: ${error.message}`);
-          urlMap[photoUrl] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-        }
-      }
-    });
-
-    // Wait for all conversions to complete in parallel (max 3 seconds total)
-    await Promise.all(fetchPromises);
+    await Promise.all(
+      uniqueUrls.map(async (url) => {
+        urlMap[url] = await PDFService.resolveToBase64(url);
+      })
+    );
 
     const uniqueUserDataDir = path.join(os.tmpdir(), `puppeteer_profile_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     const browser = await puppeteer.launch({
@@ -296,23 +292,26 @@ export class PDFService {
         }
       }
       
-      const fileName = `vistoria_${inspection.id}.pdf`;
-      const filePath = path.join(__dirname, '../../public/uploads', fileName);
-      
-      // Create uploads dir if not exists
-      const uploadsDir = path.join(__dirname, '../../public/uploads');
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-      await page.pdf({
-        path: filePath,
+      // Generate the PDF as a buffer (no disk writes)
+      const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
         margin: { top: '0', right: '0', bottom: '0', left: '0' }
       });
 
       await browser.close();
+
+      // Save the PDF to the Media table
+      const media = await prisma.media.create({
+        data: {
+          filename: pdfFilename,
+          mimeType: 'application/pdf',
+          data: Buffer.from(pdfBuffer),
+          size: pdfBuffer.length,
+        },
+      });
       
-      return `${apiUrl}/uploads/${fileName}`;
+      return `/api/media/${media.id}`;
     } catch (error) {
       console.error('PDFService.generateInspectionPDF error:', error);
       await browser.close();

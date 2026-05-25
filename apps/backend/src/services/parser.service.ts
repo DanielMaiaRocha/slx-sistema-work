@@ -1,25 +1,41 @@
 import path from 'path';
 import fs from 'fs';
+import prisma from '../config/prisma';
 const pdf = require('pdf-parse');
 
 export class ParserService {
   static async parseContract(fileUrl: string) {
     try {
-      // Resolve local path from URL
-      let targetPath = fileUrl;
-      if (fileUrl.includes('/uploads/')) {
-        const fileName = fileUrl.split('/uploads/').pop();
-        targetPath = path.join(process.cwd(), 'public/uploads', fileName!);
+      let dataBuffer: Buffer;
+
+      // New format: /api/media/:id — read directly from DB
+      const mediaMatch = fileUrl.match(/\/api\/media\/([a-zA-Z0-9_-]+)/);
+      if (mediaMatch) {
+        const media = await prisma.media.findUnique({ where: { id: mediaMatch[1] } });
+        if (!media) {
+          console.error('🤖 [AUTO PARSER] Media not found in DB:', mediaMatch[1]);
+          return {};
+        }
+        console.log('🤖 [AUTO PARSER] Reading from DB, media id:', media.id);
+        dataBuffer = Buffer.from(media.data);
+      } else {
+        // Legacy: read from filesystem for old /uploads/ URLs
+        let targetPath = fileUrl;
+        if (fileUrl.includes('/uploads/')) {
+          const fileName = fileUrl.split('/uploads/').pop();
+          targetPath = path.join(process.cwd(), 'public/uploads', fileName!);
+        }
+
+        console.log('🤖 [AUTO PARSER] Target Path:', targetPath);
+
+        if (!fs.existsSync(targetPath)) {
+          console.error('🤖 [AUTO PARSER] File not found:', targetPath);
+          return {};
+        }
+
+        dataBuffer = fs.readFileSync(targetPath);
       }
 
-      console.log('🤖 [AUTO PARSER] Target Path:', targetPath);
-
-      if (!fs.existsSync(targetPath)) {
-        console.error('🤖 [AUTO PARSER] File not found:', targetPath);
-        return {};
-      }
-
-      const dataBuffer = fs.readFileSync(targetPath);
       const data = await pdf(dataBuffer);
       const text = data.text;
 

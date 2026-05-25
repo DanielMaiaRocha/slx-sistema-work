@@ -104,7 +104,7 @@ export class InspectionController {
         // Let's implement a simpler "Save All" for now.
       }
 
-      PDFService.deleteInspectionPDF(id);
+      await PDFService.deleteInspectionPDF(id);
 
       res.json({ message: 'Vistoria atualizada com sucesso.' });
     } catch (error) {
@@ -123,7 +123,7 @@ export class InspectionController {
           inspectionId
         }
       });
-      PDFService.deleteInspectionPDF(inspectionId);
+      await PDFService.deleteInspectionPDF(inspectionId);
       res.json(room);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao adicionar cômodo.' });
@@ -138,7 +138,7 @@ export class InspectionController {
         where: { id: roomId },
         data: { name, order }
       });
-      PDFService.deleteInspectionPDF(room.inspectionId);
+      await PDFService.deleteInspectionPDF(room.inspectionId);
       res.json(room);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao atualizar cômodo.' });
@@ -151,7 +151,7 @@ export class InspectionController {
       const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
       if (room) {
         await prisma.inspectionRoom.delete({ where: { id: roomId } });
-        PDFService.deleteInspectionPDF(room.inspectionId);
+        await PDFService.deleteInspectionPDF(room.inspectionId);
       }
       res.json({ message: 'Cômodo removido.' });
     } catch (error) {
@@ -168,7 +168,7 @@ export class InspectionController {
       });
       const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
       if (room) {
-        PDFService.deleteInspectionPDF(room.inspectionId);
+        await PDFService.deleteInspectionPDF(room.inspectionId);
       }
       res.json(item);
     } catch (error) {
@@ -186,7 +186,7 @@ export class InspectionController {
       });
       const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
       if (room) {
-        PDFService.deleteInspectionPDF(room.inspectionId);
+        await PDFService.deleteInspectionPDF(room.inspectionId);
       }
       res.json(item);
     } catch (error) {
@@ -202,7 +202,7 @@ export class InspectionController {
         await prisma.inspectionItem.delete({ where: { id: itemId } });
         const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
         if (room) {
-          PDFService.deleteInspectionPDF(room.inspectionId);
+          await PDFService.deleteInspectionPDF(room.inspectionId);
         }
       }
       res.json({ message: 'Item removido.' });

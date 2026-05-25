@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import dotenv from 'dotenv';
 import routes from './routes';
 
@@ -32,10 +31,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+// Media is now served from the database via /api/media/:id route
 
 app.use('/api', routes);
 

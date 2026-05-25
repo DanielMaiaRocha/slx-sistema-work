@@ -59,6 +59,8 @@ model User {
   permissions       String?  @default("{}") // JSON string of granular permissions
   cpf               String?  @unique
   isEmailVerified   Boolean  @default(false)
+  photoUrl          String?
+  creci             String?
   
   asaasId           String?  @unique
   

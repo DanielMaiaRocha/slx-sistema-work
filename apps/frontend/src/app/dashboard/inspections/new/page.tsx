@@ -787,12 +787,15 @@ export default function NewInspectionPage() {
                                       {(photoFiles[`item-${item.id}`]?.length > 0 || videoFiles[`item-${item.id}`]?.length > 0) && (
                                         <div className="flex flex-wrap gap-2.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
                                           {photoFiles[`item-${item.id}`]?.map((file, idx) => (
-                                            <div key={`${file.name}-${idx}`} className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm">
+                                            <div 
+                                              key={`${file.name}-${idx}`} 
+                                              className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
+                                              onClick={() => setPreviewImage(URL.createObjectURL(file))}
+                                            >
                                               <img 
                                                 src={URL.createObjectURL(file)} 
-                                                className="w-full h-full object-cover transition-transform group-hover:scale-110 cursor-zoom-in" 
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-110" 
                                                 onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
-                                                onClick={() => setPreviewImage(URL.createObjectURL(file))}
                                               />
                                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                 <button 

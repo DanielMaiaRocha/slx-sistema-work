@@ -49,7 +49,7 @@ export default function UsersPage() {
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [docUser, setDocUser] = useState<any>(null);
   const [docUploading, setDocUploading] = useState(false);
-  const [docForm, setDocForm] = useState({ name: '', visibility: 'ALL', type: 'CONTRACT_LEASE' });
+  const [docForm, setDocForm] = useState<{ name: string; visibility: string; type: string; address?: string }>({ name: '', visibility: 'ALL', type: 'CONTRACT_LEASE', address: '' });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [userDocs, setUserDocs] = useState<any[]>([]);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
@@ -58,6 +58,17 @@ export default function UsersPage() {
   const visibilityDropdownRef = useRef<HTMLDivElement>(null);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [docModalType, setDocModalType] = useState<'CONTRACT' | 'DOCUMENT'>('DOCUMENT');
+  const [propertiesForDoc, setPropertiesForDoc] = useState<any[]>([]);
+
+  const loadPropertiesForDoc = async (userId: string) => {
+    try {
+      const data = await fetchApi(`/users/${userId}/properties`);
+      setPropertiesForDoc(data || []);
+    } catch (err) {
+      console.error('Error loading properties for doc:', err);
+      setPropertiesForDoc([]);
+    }
+  };
 
   const LIMIT = 15;
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -147,6 +158,7 @@ export default function UsersPage() {
             name: docForm.name,
             visibility: docForm.visibility,
             type: docForm.type,
+            address: docForm.address || '',
             ...(fileUrl && { url: fileUrl })
           })
         });
@@ -159,7 +171,8 @@ export default function UsersPage() {
             url: fileUrl,
             userId: docUser.id,
             visibility: docForm.visibility,
-            type: docForm.type
+            type: docForm.type,
+            address: docForm.address || ''
           })
         });
         toast.success('Documento anexado!');
@@ -167,7 +180,7 @@ export default function UsersPage() {
 
       setSelectedFile(null);
       setEditingDocId(null);
-      setDocForm({ name: '', visibility: 'ALL', type: 'CONTRACT_LEASE' });
+      setDocForm({ name: '', visibility: 'ALL', type: 'CONTRACT_LEASE', address: '' });
       loadUserDocs(docUser.id);
     } catch (err: any) {
       toast.error(err.message || 'Erro no processo');
@@ -177,7 +190,7 @@ export default function UsersPage() {
   };
 
   const handleEditDoc = (doc: any) => {
-    setDocForm({ name: doc.name, visibility: doc.visibility, type: doc.type });
+    setDocForm({ name: doc.name, visibility: doc.visibility, type: doc.type, address: doc.address || '' });
     setEditingDocId(doc.id);
     toast.success('Editando: ' + doc.name);
   };
@@ -486,8 +499,13 @@ export default function UsersPage() {
                   setDocUser(user); 
                   setIsDocModalOpen(true); 
                   setDocModalType('CONTRACT');
-                  setDocForm({ name: 'Contrato de Locação', visibility: 'ALL', type: 'CONTRACT_LEASE' }); 
+                  setDocForm({ name: 'Contrato de Locação', visibility: 'ALL', type: 'CONTRACT_LEASE', address: '' }); 
                   loadUserDocs(user.id); 
+                  if (isProprietario(user.role)) {
+                    loadPropertiesForDoc(user.id);
+                  } else {
+                    setPropertiesForDoc([]);
+                  }
                 }}
                 className="flex flex-col items-center justify-center gap-0.5 py-2.5 bg-primary/10 text-primary rounded-lg transition-all active:scale-95"
               >
@@ -499,8 +517,13 @@ export default function UsersPage() {
                   setDocUser(user); 
                   setIsDocModalOpen(true); 
                   setDocModalType('DOCUMENT');
-                  setDocForm({ name: '', visibility: 'ALL', type: 'DOCUMENT' }); 
+                  setDocForm({ name: '', visibility: 'ALL', type: 'DOCUMENT', address: '' }); 
                   loadUserDocs(user.id); 
+                  if (isProprietario(user.role)) {
+                    loadPropertiesForDoc(user.id);
+                  } else {
+                    setPropertiesForDoc([]);
+                  }
                 }}
                 className="flex flex-col items-center justify-center gap-0.5 py-2.5 bg-slate-50 text-slate-400 rounded-lg transition-all active:scale-95 border border-slate-100"
               >
@@ -608,8 +631,13 @@ export default function UsersPage() {
                           setDocUser(user); 
                           setIsDocModalOpen(true); 
                           setDocModalType('CONTRACT');
-                          setDocForm({ name: 'Contrato de Locação', visibility: 'ALL', type: 'CONTRACT_LEASE' }); 
+                          setDocForm({ name: 'Contrato de Locação', visibility: 'ALL', type: 'CONTRACT_LEASE', address: '' }); 
                           loadUserDocs(user.id); 
+                          if (isProprietario(user.role)) {
+                            loadPropertiesForDoc(user.id);
+                          } else {
+                            setPropertiesForDoc([]);
+                          }
                         }}
                         className="flex items-center gap-2 px-3.5 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all text-[10px] font-black uppercase tracking-widest group shadow-sm cursor-pointer active:scale-95"
                       >
@@ -621,8 +649,13 @@ export default function UsersPage() {
                           setDocUser(user); 
                           setIsDocModalOpen(true); 
                           setDocModalType('DOCUMENT');
-                          setDocForm({ name: '', visibility: 'ALL', type: 'DOCUMENT' }); 
+                          setDocForm({ name: '', visibility: 'ALL', type: 'DOCUMENT', address: '' }); 
                           loadUserDocs(user.id); 
+                          if (isProprietario(user.role)) {
+                            loadPropertiesForDoc(user.id);
+                          } else {
+                            setPropertiesForDoc([]);
+                          }
                         }}
                         className="p-2.5 bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
                         title="Anexar Documentos"
@@ -1016,6 +1049,29 @@ export default function UsersPage() {
                         </AnimatePresence>
                       </div>
                     </div>
+
+                    {isProprietario(docUser?.role) && docForm.type.startsWith('CONTRACT') && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Imóvel Vinculado</label>
+                        <select
+                          value={docForm.address || ''}
+                          onChange={(e) => setDocForm({ ...docForm, address: e.target.value })}
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Não vincular a nenhum imóvel</option>
+                          {propertiesForDoc.map((prop: any) => {
+                            const fullAddr = [prop.address, prop.number, prop.complement, prop.neighborhood, prop.city, prop.state]
+                              .filter(Boolean)
+                              .join(', ');
+                            return (
+                              <option key={prop.id} value={fullAddr}>
+                                {fullAddr}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -1051,7 +1107,7 @@ export default function UsersPage() {
                     <button 
                       onClick={() => {
                         setEditingDocId(null);
-                        setDocForm({ name: '', visibility: 'ALL', type: 'CONTRACT_LEASE' });
+                        setDocForm({ name: '', visibility: 'ALL', type: 'CONTRACT_LEASE', address: '' });
                         setSelectedFile(null);
                       }}
                       className="w-full py-3 bg-slate-100 text-slate-500 hover:text-slate-900 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all cursor-pointer"

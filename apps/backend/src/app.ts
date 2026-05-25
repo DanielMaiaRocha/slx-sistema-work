@@ -15,6 +15,11 @@ const corsOptions = {
       'http://localhost:3001',
     ];
 
+    if (process.env.FRONTEND_URL) {
+      allowedOrigins.push(process.env.FRONTEND_URL);
+      allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+    }
+
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

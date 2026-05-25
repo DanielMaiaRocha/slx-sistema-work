@@ -38,7 +38,7 @@ export class DocumentController {
   }
 
   static async listUserDocuments(req: Request, res: Response) {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const tenantId = req.tenantId;
 
     try {
@@ -69,7 +69,7 @@ export class DocumentController {
   }
 
   static async upload(req: Request, res: Response) {
-    const { name, url, type, userId: targetUserId, visibility } = req.body;
+    const { name, url, type, userId: targetUserId, visibility, address } = req.body;
     const currentUserId = req.user?.id;
     const tenantId = req.tenantId;
 
@@ -106,7 +106,8 @@ export class DocumentController {
           type: type || 'OTHER',
           userId: user.id, // Always use the Prisma local ID for the relationship
           tenantId,
-          visibility: visibility || 'ALL'
+          visibility: visibility || 'ALL',
+          address: address || null
         },
       });
 
@@ -125,7 +126,7 @@ export class DocumentController {
           where: { id: document.id },
           data: {
             amount: amount,
-            address: metadata.address || null,
+            address: address || metadata.address || null, // Prioritize manually selected address!
             duration: metadata.duration || null
           }
         });
@@ -139,14 +140,14 @@ export class DocumentController {
   }
 
   static async update(req: Request, res: Response) {
-    const { id } = req.params;
-    const { name, type, visibility } = req.body;
+    const id = req.params.id as string;
+    const { name, type, visibility, address } = req.body;
     const tenantId = req.tenantId;
 
     try {
       const document = await prisma.document.update({
         where: { id, tenantId },
-        data: { name, type, visibility }
+        data: { name, type, visibility, address: address || null }
       });
       res.json(document);
     } catch (error) {
@@ -155,7 +156,7 @@ export class DocumentController {
   }
 
   static async delete(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const tenantId = req.tenantId;
 
     try {
@@ -196,7 +197,7 @@ export class DocumentController {
   }
 
   static async reparseUserContracts(req: Request, res: Response) {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const tenantId = req.tenantId;
 
     try {

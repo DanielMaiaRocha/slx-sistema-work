@@ -7,8 +7,8 @@ export class ParserService {
     try {
       // Resolve local path from URL
       let targetPath = fileUrl;
-      if (fileUrl.startsWith('http://localhost:3001/uploads/')) {
-        const fileName = fileUrl.split('/').pop();
+      if (fileUrl.includes('/uploads/')) {
+        const fileName = fileUrl.split('/uploads/').pop();
         targetPath = path.join(process.cwd(), 'public/uploads', fileName!);
       }
 

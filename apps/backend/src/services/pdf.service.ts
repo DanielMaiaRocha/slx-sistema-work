@@ -1,12 +1,124 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import axios from 'axios';
 
 export class PDFService {
+  static deleteInspectionPDF(inspectionId: string) {
+    try {
+      const filePath = path.join(__dirname, '../../public/uploads', `vistoria_${inspectionId}.pdf`);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`Deleted cached PDF for inspection ${inspectionId}`);
+      }
+    } catch (err) {
+      console.error('Error deleting cached PDF:', err);
+    }
+  }
+
   static async generateInspectionPDF(inspection: any, branding: any) {
+    const fileName = `vistoria_${inspection.id}.pdf`;
+    const filePath = path.join(__dirname, '../../public/uploads', fileName);
+
+    const apiUrl = process.env.API_URL || 'https://slx-sistema-work-production.up.railway.app';
+
+    // 1. If the file already exists, return the URL immediately!
+    if (fs.existsSync(filePath)) {
+      console.log(`PDF already exists for inspection ${inspection.id}, returning cached path.`);
+      return `${apiUrl}/uploads/${fileName}`;
+    }
+
+    // 2. Collect and pre-fetch all image URLs to Base64 in parallel
+    const urlsToFetch: string[] = [];
+    if (branding?.logoUrl) urlsToFetch.push(branding.logoUrl);
+    
+    if (inspection.rooms) {
+      inspection.rooms.forEach((room: any) => {
+        if (room.photos) {
+          room.photos.forEach((p: any) => {
+            if (p.url) urlsToFetch.push(p.url);
+          });
+        }
+        if (room.items) {
+          room.items.forEach((item: any) => {
+            if (item.photos) {
+              item.photos.forEach((p: any) => {
+                if (p.url) urlsToFetch.push(p.url);
+              });
+            }
+          });
+        }
+      });
+    }
+
+    const uniqueUrls = Array.from(new Set(urlsToFetch));
+    const urlMap: Record<string, string> = {};
+
+    const fetchPromises = uniqueUrls.map(async (photoUrl) => {
+      if (!photoUrl) return;
+
+      // Try local file first
+      try {
+        const isLocalUpload = photoUrl.startsWith('/uploads/') || photoUrl.startsWith('uploads/') || photoUrl.includes('/uploads/') || !photoUrl.startsWith('http');
+        const filename = path.basename(photoUrl);
+        const localPath = path.join(__dirname, '../../public/uploads', filename);
+
+        if (fs.existsSync(localPath)) {
+          const fileBuffer = fs.readFileSync(localPath);
+          const extension = path.extname(filename).substring(1).toLowerCase() || 'png';
+          const base64 = fileBuffer.toString('base64');
+          urlMap[photoUrl] = `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${base64}`;
+          return;
+        }
+      } catch (err) {
+        console.error('Error reading local file for pre-fetch:', err);
+      }
+
+      // If not local, and it starts with http, fetch it over the network
+      if (photoUrl.startsWith('http')) {
+        try {
+          const response = await axios.get(photoUrl, {
+            responseType: 'arraybuffer',
+            timeout: 3000,
+          });
+          const buffer = Buffer.from(response.data, 'binary');
+          const contentType = response.headers['content-type'] || 'image/jpeg';
+          urlMap[photoUrl] = `data:${contentType};base64,${buffer.toString('base64')}`;
+        } catch (error: any) {
+          console.warn(`Failed to fetch remote image: ${photoUrl}. Error: ${error.message}`);
+          urlMap[photoUrl] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        }
+      } else {
+        const fullUrl = `${apiUrl}${photoUrl.startsWith('/') ? photoUrl : '/' + photoUrl}`;
+        try {
+          const response = await axios.get(fullUrl, {
+            responseType: 'arraybuffer',
+            timeout: 3000,
+          });
+          const buffer = Buffer.from(response.data, 'binary');
+          const contentType = response.headers['content-type'] || 'image/jpeg';
+          urlMap[photoUrl] = `data:${contentType};base64,${buffer.toString('base64')}`;
+        } catch (error: any) {
+          console.warn(`Failed to fetch remote fallback image: ${fullUrl}. Error: ${error.message}`);
+          urlMap[photoUrl] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        }
+      }
+    });
+
+    // Wait for all conversions to complete in parallel (max 3 seconds total)
+    await Promise.all(fetchPromises);
+
+    const uniqueUserDataDir = path.join(os.tmpdir(), `puppeteer_profile_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      userDataDir: uniqueUserDataDir,
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
     });
 
     try {
@@ -16,15 +128,8 @@ export class PDFService {
       const tenant = JSON.parse(inspection.tenantData || '{}');
       const inspector = JSON.parse(inspection.inspectorData || '{}');
 
-      // Get the API URL - use production URL as default
-      const apiUrl = process.env.API_URL || 'https://slx-sistema-work-production.up.railway.app';
-
-      // Helper function to ensure full URLs for images
       const getFullPhotoUrl = (photoUrl: string) => {
-        if (photoUrl.startsWith('http')) {
-          return photoUrl;
-        }
-        return `${apiUrl}${photoUrl.startsWith('/') ? photoUrl : '/' + photoUrl}`;
+        return urlMap[photoUrl] || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
       };
 
       // Simple HTML template for the PDF
@@ -54,8 +159,8 @@ export class PDFService {
             .status-REG { background: #fef3c7; color: #92400e; }
             .status-RUIM { background: #fee2e2; color: #991b1b; }
             .item-desc { font-size: 11px; flex: 1; }
-            .photo-grid { display: grid; grid-template-cols: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
-            .photo-item { height: 130px; overflow: hidden; border-radius: 4px; border: 1px solid #ddd; background: #f9f9f9; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+            .photo-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+            .photo-item { width: 160px; height: 160px; overflow: hidden; border-radius: 8px; border: 1px solid #ddd; background: #f9f9f9; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
             .photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
             .item-detail { margin-left: 55px; margin-bottom: 15px; }
             .item-obs { font-size: 9px; color: #666; font-style: italic; background: #fafafa; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px; border-left: 2px solid #eee; }
@@ -68,7 +173,7 @@ export class PDFService {
         </head>
         <body>
           <div class="header">
-            <img src="${branding?.logoUrl || ''}" class="logo" alt="Logo">
+            <img src="${branding?.logoUrl ? getFullPhotoUrl(branding.logoUrl) : ''}" class="logo" alt="Logo">
             <div class="company-info">
               <strong>${branding?.name || 'SLX Imobiliária'}</strong><br>
               CRECI: ${branding?.config?.creci || '---'}<br>
@@ -163,7 +268,7 @@ export class PDFService {
             </div>
             <div class="sig-box">
               VISTORIADOR: ${inspector.name || inspection.user?.name || '---'}<br>
-              CRECI: ${inspector.creci || '---'}
+              CRECI: ${inspector.creci || inspection.user?.creci || '---'}
             </div>
             <div class="sig-box">
               TESTEMUNHA<br>
@@ -178,7 +283,18 @@ export class PDFService {
         </html>
       `;
 
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      try {
+        await page.setContent(htmlContent, { 
+          waitUntil: 'load',
+          timeout: 4000
+        });
+      } catch (e: any) {
+        if (e.name === 'TimeoutError' || e.message?.includes('timeout')) {
+          console.warn('PDFService.generateInspectionPDF warning: Navigation/load timeout reached. Generating PDF with partially loaded assets.');
+        } else {
+          throw e;
+        }
+      }
       
       const fileName = `vistoria_${inspection.id}.pdf`;
       const filePath = path.join(__dirname, '../../public/uploads', fileName);

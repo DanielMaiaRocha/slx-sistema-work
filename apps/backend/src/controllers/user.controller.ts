@@ -167,7 +167,7 @@ export class UserController {
   }
 
   static async update(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { name, email, password, role, phone, permissions } = req.body;
 
     try {
@@ -257,7 +257,7 @@ export class UserController {
   }
 
   static async updateCustomer(req: Request, res: Response) {
-    const { asaasId } = req.params;
+    const asaasId = req.params.asaasId as string;
     const { name, phone, role } = req.body;
 
     try {
@@ -297,7 +297,7 @@ export class UserController {
   }
 
   static async getUserProperties(req: Request, res: Response) {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const tenantId = req.tenantId;
 
     try {
@@ -325,7 +325,7 @@ export class UserController {
   }
 
   static async updateUserProperties(req: Request, res: Response) {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const { properties } = req.body;
     const tenantId = req.tenantId;
 
@@ -424,7 +424,7 @@ export class UserController {
   }
 
   static async delete(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     try {
       await prisma.user.update({ 
         where: { id },
@@ -434,6 +434,74 @@ export class UserController {
     } catch (error) {
       console.error('UserController.delete error:', error);
       res.status(500).json({ error: 'Falha ao remover colaborador.' });
+    }
+  }
+
+  static async getProfile(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuário não autenticado.' });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const { password, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error: any) {
+      console.error('UserController.getProfile error:', error);
+      res.status(500).json({ error: 'Falha ao buscar perfil.', details: error.message });
+    }
+  }
+
+  static async updateProfile(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Usuário não autenticado.' });
+    }
+
+    const { name, phone, cpf, creci, photoUrl } = req.body;
+
+    try {
+      if (cpf) {
+        const cleanCpf = cpf.replace(/\D/g, '');
+        const collision = await prisma.user.findFirst({
+          where: {
+            cpf: cleanCpf,
+            id: { not: userId }
+          }
+        });
+        if (collision) {
+          return res.status(400).json({ error: 'Este CPF já está cadastrado para outro usuário.' });
+        }
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          name,
+          phone: phone ? phone.replace(/\D/g, '') : null,
+          cpf: cpf ? cpf.replace(/\D/g, '') : null,
+          creci: creci || null,
+          photoUrl: photoUrl || null
+        }
+      });
+
+      const { password, ...safeUser } = updatedUser;
+
+      res.json({
+        message: 'Perfil atualizado com sucesso.',
+        user: safeUser
+      });
+    } catch (error: any) {
+      console.error('UserController.updateProfile error:', error);
+      res.status(500).json({ error: 'Falha ao atualizar perfil do usuário.', details: error.message });
     }
   }
 }

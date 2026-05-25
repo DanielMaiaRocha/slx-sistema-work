@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Eye,
   Check,
-  
+  Building2,
+  User as UserIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
@@ -34,6 +35,8 @@ import { cn } from '@/lib/utils';
 import { useBranding } from '@/components/BrandingProvider';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import { useAuth } from '@/hooks/useAuth';
+import Cookies from 'js-cookie';
 
 const DEFAULT_SETTINGS = {
   name: 'SLX Imobiliária',
@@ -51,13 +54,110 @@ const DEFAULT_SETTINGS = {
       showDocs: true,
       showQuickActions: true
     },
-    quickLinks: [] as any[]
+    quickLinks: [] as any[],
+    creci: '',
+    phone: '',
+    email: '',
+    address: '',
+    olxPage: ''
   }
 };
 
 export default function SettingsPage() {
   const { branding: globalBranding, refreshBranding } = useBranding();
-  const [activeTab, setActiveTab] = useState('Aparência');
+  const { user } = useAuth();
+  
+  const isManagement = user?.role?.split(',').some((r: any) => r.trim() === 'ADMIN' || r.trim() === 'OWNER');
+  
+  const [activeTab, setActiveTab] = useState('Perfil do Usuário');
+  
+  useEffect(() => {
+    if (user) {
+      const isMng = user.role?.split(',').some((r: any) => r.trim() === 'ADMIN' || r.trim() === 'OWNER');
+      setActiveTab(isMng ? 'Perfil Imobiliária' : 'Perfil do Usuário');
+    }
+  }, [user]);
+
+  const [userProfile, setUserProfile] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    cpf: '',
+    creci: '',
+    photoUrl: ''
+  });
+  const [userProfileLoading, setUserProfileLoading] = useState(true);
+  const [isSavingUser, setIsSavingUser] = useState(false);
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const data = await fetchApi('/users/profile/me');
+        setUserProfile({
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone ? formatPhone(data.phone) : '',
+          cpf: data.cpf ? formatCPF(data.cpf) : '',
+          creci: data.creci || '',
+          photoUrl: data.photoUrl || ''
+        });
+      } catch (e: any) {
+        console.error('Failed to load user profile', e);
+        toast.error('Erro ao carregar dados do usuário.');
+      } finally {
+        setUserProfileLoading(false);
+      }
+    };
+    if (user) {
+      loadUserProfile();
+    }
+  }, [user]);
+
+  const handleSaveUser = async () => {
+    setIsSavingUser(true);
+    try {
+      const response = await fetchApi('/users/profile/me', {
+        method: 'PUT',
+        body: JSON.stringify(userProfile)
+      });
+      
+      const updatedUser = {
+        ...user,
+        name: response.user.name,
+        photoUrl: response.user.photoUrl
+      };
+      
+      const cookieOptions = { expires: 7, path: '/', sameSite: 'lax' as const };
+      Cookies.set('user', JSON.stringify(updatedUser), cookieOptions);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      toast.success('Perfil atualizado com sucesso!');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar alterações.');
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  const formatCPF = (val: string) => {
+    const clean = val.replace(/\D/g, '').substring(0, 11);
+    if (clean.length <= 3) return clean;
+    if (clean.length <= 6) return `${clean.substring(0, 3)}.${clean.substring(3)}`;
+    if (clean.length <= 9) return `${clean.substring(0, 3)}.${clean.substring(3, 6)}.${clean.substring(6)}`;
+    return `${clean.substring(0, 3)}.${clean.substring(3, 6)}.${clean.substring(6, 9)}-${clean.substring(9)}`;
+  };
+
+  const formatPhone = (val: string) => {
+    const clean = val.replace(/\D/g, '').substring(0, 11);
+    if (clean.length <= 2) return clean.length > 0 ? `(${clean}` : '';
+    if (clean.length <= 6) return `(${clean.substring(0, 2)}) ${clean.substring(2)}`;
+    if (clean.length <= 10) return `(${clean.substring(0, 2)}) ${clean.substring(2, 6)}-${clean.substring(6)}`;
+    return `(${clean.substring(0, 2)}) ${clean.substring(2, 7)}-${clean.substring(7)}`;
+  };
+
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -184,14 +284,18 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-10">
         {/* Navigation */}
         <div className="lg:col-span-3">
-          <div className="flex lg:flex-col gap-2 overflow-x-auto scrollbar-hide pb-2 lg:pb-0">[
+          <div className="flex lg:flex-col gap-2 overflow-x-auto scrollbar-hide pb-2 lg:pb-0">
             {[
-            { icon: Palette, label: 'Aparência' },
-            { icon: LayoutDashboard, label: 'Dashboard' },
-            { icon: LinkIcon, label: 'Ações Rápidas' },
-            { icon: Globe, label: 'Integrações' },
-            { icon: Shield, label: 'Segurança' },
-          ].map((item, i) => (
+              ...(isManagement ? [{ icon: Building2, label: 'Perfil Imobiliária' }] : []),
+              { icon: UserIcon, label: 'Perfil do Usuário' },
+              ...(isManagement ? [
+                { icon: Palette, label: 'Aparência' },
+                { icon: LayoutDashboard, label: 'Dashboard' },
+                { icon: LinkIcon, label: 'Ações Rápidas' },
+                { icon: Globe, label: 'Integrações' },
+                { icon: Shield, label: 'Segurança' }
+              ] : [])
+            ].map((item, i) => (
               <button 
                 key={i}
                 onClick={() => setActiveTab(item.label)}
@@ -219,6 +323,232 @@ export default function SettingsPage() {
               exit={{ opacity: 0, y: -20 }}
               className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-8 space-y-8 sm:space-y-12 shadow-sm"
             >
+              {/* --- TAB: PERFIL IMOBILIÁRIA --- */}
+              {activeTab === 'Perfil Imobiliária' && (
+                <div className="space-y-12">
+                  <section className="space-y-8">
+                    <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+                       <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20 shadow-sm">
+                          <Building2 className="w-6 h-6" />
+                       </div>
+                       <div>
+                          <h2 className="text-xl font-bold text-slate-900">Perfil da Imobiliária</h2>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Informações institucionais e de contato</p>
+                       </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div className="space-y-2.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CRECI da Imobiliária</label>
+                        <input 
+                          type="text" 
+                          value={settings.config.creci || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            config: { ...settings.config, creci: e.target.value }
+                          })}
+                          placeholder="Ex: 12345-J"
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone para Contato</label>
+                        <input 
+                          type="text" 
+                          value={formatPhone(settings.config.phone || '')}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            config: { ...settings.config, phone: formatPhone(e.target.value) }
+                          })}
+                          placeholder="Ex: (21) 99999-9999"
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                        />
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail de Contato</label>
+                        <input 
+                          type="email" 
+                          value={settings.config.email || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            config: { ...settings.config, email: e.target.value }
+                          })}
+                          placeholder="Ex: contato@imobiliaria.com"
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                        />
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Página na OLX</label>
+                        <input 
+                          type="text" 
+                          value={settings.config.olxPage || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            config: { ...settings.config, olxPage: e.target.value }
+                          })}
+                          placeholder="Ex: https://www.olx.com.br/perfil/imobiliaria"
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço da Sede</label>
+                        <input 
+                          type="text" 
+                          value={settings.config.address || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            config: { ...settings.config, address: e.target.value }
+                          })}
+                          placeholder="Ex: Av. Atlântica, 1000 - Copacabana, Rio de Janeiro - RJ"
+                          className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                        />
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {/* --- TAB: PERFIL DO USUÁRIO --- */}
+              {activeTab === 'Perfil do Usuário' && (
+                <div className="space-y-12">
+                  {userProfileLoading ? (
+                    <div className="flex items-center justify-center min-h-[200px]">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : (
+                    <section className="space-y-8">
+                      <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+                         <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20 shadow-sm">
+                            <UserIcon className="w-6 h-6" />
+                         </div>
+                         <div>
+                            <h2 className="text-xl font-bold text-slate-900">Meu Perfil</h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Configurações do usuário logado</p>
+                         </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Foto de Perfil</label>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 p-4 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200 shadow-inner group/photo">
+                          <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative group shadow-xl shadow-slate-200/50">
+                              {userProfile.photoUrl ? (
+                                <img src={userProfile.photoUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
+                              ) : (
+                                <UserIcon className="w-10 h-10 text-slate-200" />
+                              )}
+                              <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm">
+                                <Plus className="w-8 h-8 text-white" />
+                                <input 
+                                  type="file" className="hidden" accept="image/*"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    if (file.size > 2 * 1024 * 1024) {
+                                      toast.error('Foto muito grande. Use uma imagem menor que 2MB.');
+                                      return;
+                                    }
+                                    
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+                                    
+                                    const loadingToast = toast.loading('Enviando foto...');
+                                    try {
+                                      const token = Cookies.get('token') || localStorage.getItem('token');
+                                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://slx-sistema-work-production.up.railway.app/api'}/upload`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Authorization': `Bearer ${token}`
+                                        },
+                                        body: formData
+                                      });
+                                      
+                                      if (!res.ok) throw new Error('Falha no upload');
+                                      
+                                      const data = await res.json();
+                                      setUserProfile({ ...userProfile, photoUrl: data.url });
+                                      toast.success('Foto carregada com sucesso!', { id: loadingToast });
+                                    } catch (err: any) {
+                                      console.error('Photo upload error:', err);
+                                      toast.error('Erro ao fazer upload da imagem.', { id: loadingToast });
+                                    }
+                                  }}
+                                />
+                              </label>
+                          </div>
+                          <div className="space-y-2">
+                              <h4 className="text-slate-900 font-bold text-lg leading-tight">Foto de Perfil</h4>
+                              <p className="text-[11px] text-slate-500 font-medium leading-relaxed max-w-sm">
+                                Carregue uma imagem quadrada (PNG, JPG ou WEBP) para usar como seu avatar de identificação no sistema.
+                                <br/><span className="text-primary font-black uppercase tracking-widest mt-1 inline-block">Recomendado: 256x256px ou superior.</span>
+                              </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div className="space-y-2.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                          <input 
+                            type="text" 
+                            value={userProfile.name}
+                            onChange={(e) => setUserProfile({...userProfile, name: e.target.value})}
+                            className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                          />
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço de E-mail (Fixo)</label>
+                          <input 
+                            type="email" 
+                            value={userProfile.email}
+                            disabled
+                            readOnly
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 text-slate-400 text-sm font-medium outline-none cursor-not-allowed shadow-inner" 
+                          />
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone de Contato</label>
+                          <input 
+                            type="text" 
+                            value={userProfile.phone}
+                            onChange={(e) => setUserProfile({...userProfile, phone: formatPhone(e.target.value)})}
+                            placeholder="(00) 00000-0000"
+                            className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                          />
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CPF</label>
+                          <input 
+                            type="text" 
+                            value={userProfile.cpf}
+                            onChange={(e) => setUserProfile({...userProfile, cpf: formatCPF(e.target.value)})}
+                            placeholder="000.000.000-00"
+                            className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                          />
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CRECI Profissional</label>
+                          <input 
+                            type="text" 
+                            value={userProfile.creci}
+                            onChange={(e) => setUserProfile({...userProfile, creci: e.target.value})}
+                            placeholder="Ex: F-12345"
+                            className="w-full bg-white border border-slate-200 rounded-xl py-3.5 px-4 text-slate-900 text-sm font-medium focus:border-primary/50 outline-none transition-all shadow-sm" 
+                          />
+                        </div>
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
+
               {/* --- TAB: APARÊNCIA --- */}
               {activeTab === 'Aparência' && (
                 <div className="space-y-12">
@@ -523,15 +853,20 @@ export default function SettingsPage() {
               <div className="pt-10 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-3 text-slate-400">
                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-sm shadow-emerald-500/50"></div>
-                   <span className="text-[9px] font-black uppercase tracking-[0.2em]">Configurações da Imobiliária</span>
+                   <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                     {activeTab === 'Perfil do Usuário' ? 'Configurações de Perfil' : 'Configurações da Imobiliária'}
+                   </span>
                 </div>
                 <button 
-                  onClick={handleSave}
-                  disabled={isSaving}
+                  onClick={activeTab === 'Perfil do Usuário' ? handleSaveUser : handleSave}
+                  disabled={activeTab === 'Perfil do Usuário' ? isSavingUser : isSaving}
                   className="yellow-button w-full sm:w-auto text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <Save className="w-5.5 h-5.5" />
-                  {isSaving ? 'Salvando...' : 'Salvar e Aplicar Alterações'}
+                  {activeTab === 'Perfil do Usuário'
+                    ? (isSavingUser ? 'Salvando...' : 'Salvar Perfil')
+                    : (isSaving ? 'Salvando...' : 'Salvar e Aplicar Alterações')
+                  }
                 </button>
               </div>
             </motion.div>

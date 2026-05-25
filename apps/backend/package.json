@@ -4,11 +4,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc || true",
+    "build": "node ../../scripts/prepare-prisma.js && prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
     "start": "node dist/server.js",
     "seed": "ts-node src/seed.ts",
-    "prisma:generate": "prisma generate --schema=../../packages/database/prisma/schema.prisma",
-    "prisma:deploy": "prisma migrate deploy --schema=../../packages/database/prisma/schema.prisma",
+    "prisma:generate": "node ../../scripts/prepare-prisma.js && prisma generate --schema=../../packages/database/prisma/schema.prisma",
+    "prisma:deploy": "node ../../scripts/prepare-prisma.js && prisma db push --schema=../../packages/database/prisma/schema.prisma",
     "build:backend": "npm run build",
     "start:backend": "npm run start"
   },

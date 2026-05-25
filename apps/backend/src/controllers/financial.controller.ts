@@ -20,7 +20,7 @@ export class FinancialController {
   }
 
   static async getInvoiceData(req: Request, res: Response) {
-    const { recordId } = req.params;
+    const recordId = req.params.recordId as string;
 
     try {
       const record = await prisma.financialRecord.findUnique({

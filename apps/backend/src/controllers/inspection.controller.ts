@@ -20,7 +20,7 @@ export class InspectionController {
   }
 
   static async getById(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     try {
       const inspection = await prisma.inspection.findUnique({
         where: { id },
@@ -78,7 +78,7 @@ export class InspectionController {
   }
 
   static async update(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { propertyAddress, propertyNumber, cep, propertyType, landlordData, tenantData, inspectorData, status, rooms } = req.body;
 
     try {
@@ -104,6 +104,8 @@ export class InspectionController {
         // Let's implement a simpler "Save All" for now.
       }
 
+      PDFService.deleteInspectionPDF(id);
+
       res.json({ message: 'Vistoria atualizada com sucesso.' });
     } catch (error) {
       res.status(500).json({ error: 'Erro ao atualizar vistoria.' });
@@ -111,7 +113,7 @@ export class InspectionController {
   }
 
   static async addRoom(req: Request, res: Response) {
-    const { inspectionId } = req.params;
+    const inspectionId = req.params.inspectionId as string;
     const { name, order } = req.body;
     try {
       const room = await prisma.inspectionRoom.create({
@@ -121,6 +123,7 @@ export class InspectionController {
           inspectionId
         }
       });
+      PDFService.deleteInspectionPDF(inspectionId);
       res.json(room);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao adicionar cômodo.' });
@@ -128,13 +131,14 @@ export class InspectionController {
   }
 
   static async updateRoom(req: Request, res: Response) {
-    const { roomId } = req.params;
+    const roomId = req.params.roomId as string;
     const { name, order } = req.body;
     try {
       const room = await prisma.inspectionRoom.update({
         where: { id: roomId },
         data: { name, order }
       });
+      PDFService.deleteInspectionPDF(room.inspectionId);
       res.json(room);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao atualizar cômodo.' });
@@ -142,9 +146,13 @@ export class InspectionController {
   }
 
   static async deleteRoom(req: Request, res: Response) {
-    const { roomId } = req.params;
+    const roomId = req.params.roomId as string;
     try {
-      await prisma.inspectionRoom.delete({ where: { id: roomId } });
+      const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
+      if (room) {
+        await prisma.inspectionRoom.delete({ where: { id: roomId } });
+        PDFService.deleteInspectionPDF(room.inspectionId);
+      }
       res.json({ message: 'Cômodo removido.' });
     } catch (error) {
       res.status(500).json({ error: 'Erro ao remover cômodo.' });
@@ -152,12 +160,16 @@ export class InspectionController {
   }
 
   static async addItem(req: Request, res: Response) {
-    const { roomId } = req.params;
+    const roomId = req.params.roomId as string;
     const { description, status, observations, videoUrl } = req.body;
     try {
       const item = await prisma.inspectionItem.create({
         data: { description, status, observations, videoUrl, roomId }
       });
+      const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
+      if (room) {
+        PDFService.deleteInspectionPDF(room.inspectionId);
+      }
       res.json(item);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao adicionar item.' });
@@ -165,13 +177,17 @@ export class InspectionController {
   }
 
   static async updateItem(req: Request, res: Response) {
-    const { itemId } = req.params;
+    const itemId = req.params.itemId as string;
     const { description, status, observations, videoUrl } = req.body;
     try {
       const item = await prisma.inspectionItem.update({
         where: { id: itemId },
         data: { description, status, observations, videoUrl }
       });
+      const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
+      if (room) {
+        PDFService.deleteInspectionPDF(room.inspectionId);
+      }
       res.json(item);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao atualizar item.' });
@@ -179,9 +195,16 @@ export class InspectionController {
   }
 
   static async deleteItem(req: Request, res: Response) {
-    const { itemId } = req.params;
+    const itemId = req.params.itemId as string;
     try {
-      await prisma.inspectionItem.delete({ where: { id: itemId } });
+      const item = await prisma.inspectionItem.findUnique({ where: { id: itemId } });
+      if (item) {
+        await prisma.inspectionItem.delete({ where: { id: itemId } });
+        const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
+        if (room) {
+          PDFService.deleteInspectionPDF(room.inspectionId);
+        }
+      }
       res.json({ message: 'Item removido.' });
     } catch (error) {
       res.status(500).json({ error: 'Erro ao remover item.' });
@@ -189,7 +212,7 @@ export class InspectionController {
   }
 
   static async generatePdf(req: Request, res: Response) {
-    const { id } = req.params;
+    const id = req.params.id as string;
     try {
       const inspection = await prisma.inspection.findUnique({
         where: { id },
@@ -201,7 +224,7 @@ export class InspectionController {
             }, 
             orderBy: { order: 'asc' } 
           },
-          user: { select: { name: true } }
+          user: { select: { name: true, creci: true } }
         }
       });
 

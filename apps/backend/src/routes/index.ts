@@ -58,6 +58,8 @@ router.get('/financial/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.
 router.get('/users/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_view'), UserController.listAll);
 router.get('/users/team', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.listTeam);
 router.post('/users', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.create);
+router.get('/users/profile/me', tenantMiddleware, authMiddleware(), UserController.getProfile);
+router.put('/users/profile/me', tenantMiddleware, authMiddleware(), UserController.updateProfile);
 router.get('/users/:userId/properties', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.getUserProperties);
 router.put('/users/:userId/properties', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.updateUserProperties);
 router.put('/users/:id', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.update);
@@ -94,7 +96,7 @@ router.post('/inspections/rooms/:roomId/photos', tenantMiddleware, authMiddlewar
     const photo = await prisma.inspectionPhoto.create({
       data: { 
         url, 
-        roomId: !itemId ? req.params.roomId : null,
+        roomId: !itemId ? (req.params.roomId as string) : null,
         itemId: itemId || null
       }
     });
@@ -123,7 +125,7 @@ router.post('/inspections/rooms/:roomId/videos', tenantMiddleware, authMiddlewar
     const video = await prisma.inspectionVideo.create({
       data: { 
         url, 
-        roomId: !itemId ? req.params.roomId : null,
+        roomId: !itemId ? (req.params.roomId as string) : null,
         itemId: itemId || null
       }
     });

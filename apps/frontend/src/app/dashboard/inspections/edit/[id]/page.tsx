@@ -26,7 +26,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { cn } from '@/lib/utils';
+import { cn, getAssetUrl } from '@/lib/utils';
 import ConfirmModal from '@/components/ConfirmModal';
 import ImagePreviewModal from '@/components/ImagePreviewModal';
 
@@ -733,17 +733,20 @@ export default function EditInspectionPage() {
                                       {(photoFiles[`item-${item.id}`]?.length > 0 || videoFiles[`item-${item.id}`]?.length > 0 || (item.photos && item.photos.length > 0)) && (
                                         <div className="flex flex-wrap gap-2 p-3 bg-slate-950/30 rounded-2xl border border-white/5">
                                           {item.photos?.map((p, idx) => (
-                                            <div key={idx} className="w-24 h-24 rounded-2xl overflow-hidden border border-white/10 relative group shadow-2xl cursor-zoom-in" onClick={() => setPreviewImage(p.url.startsWith('http') ? p.url : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${p.url}`)}>
-                                              <img src={p.url.startsWith('http') ? p.url : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${p.url}`} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                            <div key={idx} className="w-24 h-24 rounded-2xl overflow-hidden border border-white/10 relative group shadow-2xl cursor-zoom-in" onClick={() => setPreviewImage(getAssetUrl(p.url))}>
+                                              <img src={getAssetUrl(p.url)} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                                             </div>
                                            ))}
                                            {photoFiles[`item-${item.id}`]?.map((file, idx) => (
-                                             <div key={`new-${file.name}-${idx}`} className="w-24 h-24 rounded-2xl overflow-hidden border border-white/10 relative group shadow-2xl">
+                                             <div 
+                                               key={`new-${file.name}-${idx}`} 
+                                               className="w-24 h-24 rounded-2xl overflow-hidden border border-white/10 relative group shadow-2xl cursor-zoom-in"
+                                               onClick={() => setPreviewImage(URL.createObjectURL(file))}
+                                             >
                                                <img 
                                                  src={URL.createObjectURL(file)} 
-                                                 className="w-full h-full object-cover opacity-60 transition-transform group-hover:scale-110 cursor-zoom-in" 
+                                                 className="w-full h-full object-cover opacity-60 transition-transform group-hover:scale-110" 
                                                  onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
-                                                 onClick={() => setPreviewImage(URL.createObjectURL(file))}
                                                />
                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2">
                                                  <button 
@@ -792,9 +795,9 @@ export default function EditInspectionPage() {
                           {room.photos.length > 0 && (
                             <div className="grid grid-cols-3 md:grid-cols-5 gap-3 pt-4">
                               {room.photos.map((photo, pIdx) => (
-                                <div key={pIdx} className="relative aspect-square rounded-xl overflow-hidden group border border-white/10 cursor-zoom-in" onClick={() => setPreviewImage(photo.startsWith('http') || photo.startsWith('blob:') ? photo : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${photo}`)}>
+                                <div key={pIdx} className="relative aspect-square rounded-xl overflow-hidden group border border-white/10 cursor-zoom-in" onClick={() => setPreviewImage(getAssetUrl(photo))}>
                                   <img 
-                                    src={photo.startsWith('http') || photo.startsWith('blob:') ? photo : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${photo}`} 
+                                    src={getAssetUrl(photo)} 
                                     alt="Vistoria" 
                                     className="w-full h-full object-cover transition-transform group-hover:scale-110" 
                                   />

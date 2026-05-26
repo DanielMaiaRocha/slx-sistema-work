@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
-import prisma from '../config/prisma';
+import { Media, InspectionPhoto, InspectionVideo, Role } from '../models';
 import { AuthController } from '../controllers/auth.controller';
 import { FinancialController } from '../controllers/financial.controller';
 import { DocumentController } from '../controllers/document.controller';
@@ -12,28 +11,23 @@ import { InspectionController } from '../controllers/inspection.controller';
 import { upload } from '../config/multer';
 import { tenantMiddleware } from '../middlewares/tenant.middleware';
 import { authMiddleware } from '../middlewares/auth.middleware';
-import { Role } from '@prisma/client';
 
 const router = Router();
 
-// Helper: save an uploaded file (from multer memoryStorage) to the Media table
-// Returns the relative URL path: /api/media/:id
 async function saveFileToMedia(file: Express.Multer.File): Promise<string> {
-  const media = await prisma.media.create({
-    data: {
-      filename: file.originalname,
-      mimeType: file.mimetype,
-      data: file.buffer,
-      size: file.size,
-    },
+  const media: any = await Media.create({
+    filename: file.originalname,
+    mimeType: file.mimetype,
+    data: file.buffer,
+    size: file.size,
   });
-  return `/api/media/${media.id}`;
+  return `/api/media/${media._id}`;
 }
 
 // ─── Serve media from DB ─────────────────────────────────────────────────────
 router.get('/media/:id', async (req: Request, res: Response) => {
   try {
-    const media = await prisma.media.findUnique({ where: { id: req.params.id as string } });
+    const media: any = await Media.findById(req.params.id as string).lean();
     if (!media) return res.status(404).json({ error: 'Arquivo não encontrado' });
 
     res.set({
@@ -125,12 +119,10 @@ router.post('/inspections/rooms/:roomId/photos', tenantMiddleware, authMiddlewar
     
     const { itemId } = req.body;
     
-    const photo = await prisma.inspectionPhoto.create({
-      data: { 
-        url, 
-        roomId: !itemId ? (req.params.roomId as string) : null,
-        itemId: itemId || null
-      }
+    const photo = await InspectionPhoto.create({
+      url,
+      roomId: !itemId ? (req.params.roomId as string) : null,
+      itemId: itemId || null,
     });
     res.json(photo);
   } catch (error: any) {
@@ -154,12 +146,10 @@ router.post('/inspections/rooms/:roomId/videos', tenantMiddleware, authMiddlewar
 
     if (!url) return res.status(400).json({ error: 'Nenhum vídeo ou link enviado' });
 
-    const video = await prisma.inspectionVideo.create({
-      data: { 
-        url, 
-        roomId: !itemId ? (req.params.roomId as string) : null,
-        itemId: itemId || null
-      }
+    const video = await InspectionVideo.create({
+      url,
+      roomId: !itemId ? (req.params.roomId as string) : null,
+      itemId: itemId || null,
     });
     res.json(video);
   } catch (error: any) {

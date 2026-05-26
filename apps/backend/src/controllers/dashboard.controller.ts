@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { asaasApi } from '../services/asaas.service';
-import prisma from '../config/prisma';
-import { Role } from '@prisma/client';
+import { User, Log, Role } from '../models';
 
 export class DashboardController {
   static async getStats(req: Request, res: Response) {
@@ -42,8 +41,8 @@ export class DashboardController {
       let totalAdmins = 0;
       try {
         const [o, a] = await Promise.all([
-          prisma.user.count({ where: { tenantId: req.tenantId, role: Role.OWNER } }),
-          prisma.user.count({ where: { tenantId: req.tenantId, role: Role.ADMIN } }),
+          User.countDocuments({ tenantId: req.tenantId, role: Role.OWNER }),
+          User.countDocuments({ tenantId: req.tenantId, role: Role.ADMIN }),
         ]);
         totalOwners = o;
         totalAdmins = a;
@@ -55,12 +54,11 @@ export class DashboardController {
       const totalTenants = Math.max(0, asaasTotal - totalOwners);
 
       // 3. Sync time
-      let lastSyncLog = null;
+      let lastSyncLog: any = null;
       try {
-        lastSyncLog = await prisma.log.findFirst({
-          where: { tenantId: req.tenantId, action: 'SYNC_SUCCESS' },
-          orderBy: { createdAt: 'desc' }
-        });
+        lastSyncLog = await Log.findOne({ tenantId: req.tenantId, action: 'SYNC_SUCCESS' })
+          .sort({ createdAt: -1 })
+          .lean();
       } catch (err: any) {}
 
       // 4. Financial totals

@@ -1,64 +1,49 @@
 import { AsaasService } from './asaas.service';
-import prisma from '../config/prisma';
-import { Role, FinancialStatus, FinancialType } from '@prisma/client';
+import { User, FinancialRecord, Role, FinancialStatus, FinancialType, FinancialStatusType } from '../models';
 import bcrypt from 'bcryptjs';
 
 export class SyncService {
   static async syncAll(tenantId: string) {
     console.log(`Starting full sync for tenant: ${tenantId}`);
-    
     const customersResult = await this.syncUsers(tenantId);
     const paymentsResult = await this.syncPayments(tenantId);
-
-    return {
-      users: customersResult,
-      payments: paymentsResult,
-    };
+    return { users: customersResult, payments: paymentsResult };
   }
 
   private static async syncUsers(tenantId: string) {
     try {
-      // In a real scenario, we'd paginate through all customers
       const response = await (AsaasService as any).asaasApi.get('/customers');
       const customers = response.data.data;
 
       let imported = 0;
       for (const customer of customers) {
-        // Find or create user by email or CPF
-        const existingUser = await prisma.user.findFirst({
-          where: { 
-            OR: [
-              { email: customer.email },
-              { cpf: customer.cpfCnpj ? customer.cpfCnpj.replace(/\D/g, '') : undefined },
-              { asaasId: customer.id }
-            ],
-            tenantId 
-          }
-        });
+        const cleanCpf = customer.cpfCnpj ? customer.cpfCnpj.replace(/\D/g, '') : null;
+        const existingUser: any = await User.findOne({
+          $or: [
+            customer.email ? { email: customer.email } : null,
+            cleanCpf ? { cpf: cleanCpf } : null,
+            { asaasId: customer.id },
+          ].filter(Boolean),
+          tenantId,
+        }).lean();
 
         if (!existingUser) {
-          await prisma.user.create({
-            data: {
-              email: customer.email || `${customer.id}@asaas-sync.com`,
-              name: customer.name,
-              cpf: customer.cpfCnpj ? customer.cpfCnpj.replace(/\D/g, '') : null,
-              phone: customer.mobilePhone || customer.phone,
-              password: await bcrypt.hash('SLX_SYNC_TEMP_PWD', 10),
-              role: Role.TENANT,
-              tenantId,
-              asaasId: customer.id
-            }
+          await User.create({
+            email: customer.email || `${customer.id}@asaas-sync.com`,
+            name: customer.name,
+            cpf: cleanCpf,
+            phone: customer.mobilePhone || customer.phone,
+            password: await bcrypt.hash('SLX_SYNC_TEMP_PWD', 10),
+            role: Role.TENANT,
+            tenantId,
+            asaasId: customer.id,
           });
           imported++;
         } else if (!existingUser.asaasId || !existingUser.cpf) {
-          // Update existing user with Asaas data if missing
-          await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              asaasId: customer.id,
-              cpf: existingUser.cpf || (customer.cpfCnpj ? customer.cpfCnpj.replace(/\D/g, '') : null),
-              phone: existingUser.phone || (customer.mobilePhone || customer.phone)
-            }
+          await User.findByIdAndUpdate(existingUser._id, {
+            asaasId: customer.id,
+            cpf: existingUser.cpf || cleanCpf,
+            phone: existingUser.phone || customer.mobilePhone || customer.phone,
           });
         }
       }
@@ -77,33 +62,24 @@ export class SyncService {
       let imported = 0;
       for (const payment of payments) {
         try {
-          const existingRecord = await prisma.financialRecord.findUnique({
-            where: { asaasId: payment.id }
-          });
-
+          const existingRecord: any = await FinancialRecord.findOne({ asaasId: payment.id }).lean();
           if (!existingRecord) {
-            // Find local user for this payment
-            const user = await prisma.user.findFirst({
-              where: { asaasId: payment.customer }
-            });
-
+            const user: any = await User.findOne({ asaasId: payment.customer }).lean();
             if (!user) {
               console.warn(`⚠️ Sync: Skipping payment ${payment.id} - Customer ${payment.customer} not found locally.`);
               continue;
             }
 
-            await prisma.financialRecord.create({
-              data: {
-                description: payment.description || 'Cobrança Asaas',
-                amount: payment.value,
-                dueDate: new Date(payment.dueDate),
-                status: this.mapStatus(payment.status),
-                type: FinancialType.INCOME,
-                asaasId: payment.id,
-                asaasUrl: payment.invoiceUrl,
-                tenantId,
-                userId: user.id,
-              }
+            await FinancialRecord.create({
+              description: payment.description || 'Cobrança Asaas',
+              amount: payment.value,
+              dueDate: new Date(payment.dueDate),
+              status: this.mapStatus(payment.status),
+              type: FinancialType.INCOME,
+              asaasId: payment.id,
+              asaasUrl: payment.invoiceUrl,
+              tenantId,
+              userId: user._id,
             });
             imported++;
           }
@@ -118,7 +94,7 @@ export class SyncService {
     }
   }
 
-  private static mapStatus(asaasStatus: string): FinancialStatus {
+  private static mapStatus(asaasStatus: string): FinancialStatusType {
     switch (asaasStatus) {
       case 'RECEIVED':
       case 'CONFIRMED':

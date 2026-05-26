@@ -3,8 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserRepository } from '../repositories/user.repository';
 import { TenantRepository } from '../repositories/tenant.repository';
-import { EmailService } from '../services/email.service';
-import prisma from '../config/prisma';
+import { Tenant, User } from '../models';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
@@ -14,19 +13,16 @@ export class AuthController {
 
     try {
       console.log('🚀 [Registration] Attempting to register:', { email, name, role });
-      
-      // Safety mapping: USER is not in DB enum, map to TENANT (Operador)
+
       const finalRole = (role === 'USER') ? 'TENANT' : (role || 'TENANT');
 
-      // Find tenant (fallback to first tenant if slug not provided, e.g. from Team page)
-      let tenant;
+      let tenant: any;
       if (tenantSlug) {
         tenant = await TenantRepository.findBySlug(tenantSlug);
       } else if (req.tenantId) {
-        tenant = { id: req.tenantId };
+        tenant = { _id: req.tenantId };
       } else {
-        const tenants = await prisma.tenant.findMany({ take: 1 });
-        tenant = tenants[0];
+        tenant = await Tenant.findOne().lean();
       }
 
       if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
@@ -35,31 +31,22 @@ export class AuthController {
       if (userExists) return res.status(400).json({ error: 'User already exists' });
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await UserRepository.create({
+      const user: any = await UserRepository.create({
         email,
         password: hashedPassword,
         name,
-        tenantId: tenant.id,
+        tenantId: tenant._id,
         role: finalRole,
         permissions: permissions ? JSON.stringify(permissions) : '{}'
       });
 
-      /* Email service disabled for now per user request
-      try {
-        const verificationToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1d' });
-        await EmailService.sendVerificationEmail(email, verificationToken);
-      } catch (emailError: any) {
-        console.warn('⚠️ [Registration] User created but verification email failed:', emailError.message);
-      }
-      */
-
-      res.status(201).json({ 
+      res.status(201).json({
         message: 'Colaborador criado com sucesso!',
-        user: { id: user.id, name: user.name, email: user.email }
+        user: { id: user._id, name: user.name, email: user.email }
       });
     } catch (error: any) {
       console.error('❌ [Registration Error]:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Falha ao cadastrar colaborador',
         details: error.message
       });
@@ -75,26 +62,18 @@ export class AuthController {
         return res.status(400).json({ error: 'E-mail ou CPF é obrigatório' });
       }
 
-      // Check if identifier is CPF (numbers only or formatted)
       const cleanCpf = loginId.replace(/\D/g, '');
-      const isCpf = cleanCpf.length === 11;
 
-      const users = await prisma.user.findMany({
-        where: { 
-          OR: [
-            { email: loginId },
-            { cpf: cleanCpf }
-          ],
-          deletedAt: null 
-        }
-      });
-      
+      const users: any[] = await User.find({
+        $or: [{ email: loginId }, { cpf: cleanCpf }],
+        deletedAt: null,
+      }).lean();
+
       if (users.length === 0) {
         return res.status(401).json({ error: 'Usuário não encontrado' });
       }
 
-      // Find record with correct password
-      let primaryUser = null;
+      let primaryUser: any = null;
       for (const u of users) {
         if (await bcrypt.compare(password, u.password)) {
           primaryUser = u;
@@ -106,31 +85,28 @@ export class AuthController {
         return res.status(401).json({ error: 'Senha inválida' });
       }
 
-      // Restrict roles based on intended portal if provided
-      const allRoles = primaryUser.role.split(',').map(r => r.trim());
-      
+      const allRoles = (primaryUser.role || '').split(',').map((r: string) => r.trim());
+
       if (intendedRole && !allRoles.includes(intendedRole) && !allRoles.includes('ADMIN') && !allRoles.includes('OWNER')) {
-        return res.status(403).json({ 
-          error: `Você não possui acesso ao portal de ${intendedRole === 'TENANT' ? 'Inquilinos' : 'Proprietários'}.` 
+        return res.status(403).json({
+          error: `Você não possui acesso ao portal de ${intendedRole === 'TENANT' ? 'Inquilinos' : 'Proprietários'}.`
         });
       }
 
-      // If logging into a specific portal, only include that role in the token for that session
-      // unless they are Admin
       let sessionRole = primaryUser.role;
       if (intendedRole && (allRoles.includes(intendedRole) || allRoles.includes('ADMIN'))) {
         sessionRole = allRoles.includes('ADMIN') ? primaryUser.role : intendedRole;
       }
 
-      const userPermissions = typeof primaryUser.permissions === 'string' 
-        ? JSON.parse(primaryUser.permissions) 
+      const userPermissions = typeof primaryUser.permissions === 'string'
+        ? JSON.parse(primaryUser.permissions)
         : (primaryUser.permissions || {});
 
       const token = jwt.sign(
-        { 
-          id: primaryUser.id, 
-          email: primaryUser.email, 
-          role: sessionRole, 
+        {
+          id: primaryUser._id,
+          email: primaryUser.email,
+          role: sessionRole,
           tenantId: primaryUser.tenantId,
           permissions: userPermissions
         },
@@ -138,15 +114,15 @@ export class AuthController {
         { expiresIn: '8h' }
       );
 
-      res.json({ 
-        token, 
-        user: { 
-          id: primaryUser.id, 
-          email: primaryUser.email, 
-          role: sessionRole, 
+      res.json({
+        token,
+        user: {
+          id: primaryUser._id,
+          email: primaryUser.email,
+          role: sessionRole,
           name: primaryUser.name,
           permissions: userPermissions
-        } 
+        }
       });
     } catch (error: any) {
       console.error('Login error:', error);
@@ -154,7 +130,6 @@ export class AuthController {
         error: 'Erro ao realizar login.',
         details: error?.message,
         code: error?.code,
-        meta: error?.meta,
       });
     }
   }

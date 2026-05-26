@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../config/prisma';
+import { DocumentModel } from '../models';
 import { AsaasService } from '../services/asaas.service';
 
 export class TenantController {
@@ -52,14 +52,10 @@ export class TenantController {
 
     try {
       // Find contracts (Documents of type CONTRACT linked to this user)
-      const contracts = await prisma.document.findMany({
-        where: {
-          userId,
-          type: {
-            startsWith: 'CONTRACT'
-          }
-        }
-      });
+      const contracts = await DocumentModel.find({
+        userId,
+        type: { $regex: '^CONTRACT' }
+      }).lean();
 
       res.json(contracts);
     } catch (error: any) {

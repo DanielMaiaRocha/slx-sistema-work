@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../config/prisma';
+import { FinancialRecord } from '../models';
 import { AsaasService, asaasApi } from '../services/asaas.service';
 
 export class FinancialController {
@@ -8,10 +8,9 @@ export class FinancialController {
     const tenantId = req.tenantId;
 
     try {
-      const records = await prisma.financialRecord.findMany({
-        where: { userId, tenantId, deletedAt: null },
-        orderBy: { dueDate: 'desc' },
-      });
+      const records = await FinancialRecord.find({ userId, tenantId, deletedAt: null })
+        .sort({ dueDate: -1 })
+        .lean();
 
       res.json(records);
     } catch (error) {
@@ -23,9 +22,7 @@ export class FinancialController {
     const recordId = req.params.recordId as string;
 
     try {
-      const record = await prisma.financialRecord.findUnique({
-        where: { id: recordId },
-      });
+      const record: any = await FinancialRecord.findById(recordId).lean();
 
       if (!record || record.tenantId !== req.tenantId) {
         return res.status(404).json({ error: 'Record not found' });

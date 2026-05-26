@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import prisma from '../config/prisma';
+import { Media } from '../models';
 const pdf = require('pdf-parse');
 
 export class ParserService {
@@ -11,12 +11,12 @@ export class ParserService {
       // New format: /api/media/:id — read directly from DB
       const mediaMatch = fileUrl.match(/\/api\/media\/([a-zA-Z0-9_-]+)/);
       if (mediaMatch) {
-        const media = await prisma.media.findUnique({ where: { id: mediaMatch[1] } });
+        const media: any = await Media.findById(mediaMatch[1]).lean();
         if (!media) {
           console.error('🤖 [AUTO PARSER] Media not found in DB:', mediaMatch[1]);
           return {};
         }
-        console.log('🤖 [AUTO PARSER] Reading from DB, media id:', media.id);
+        console.log('🤖 [AUTO PARSER] Reading from DB, media id:', media._id);
         dataBuffer = Buffer.from(media.data);
       } else {
         // Legacy: read from filesystem for old /uploads/ URLs

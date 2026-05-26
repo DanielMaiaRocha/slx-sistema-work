@@ -1,21 +1,15 @@
-import prisma from '../config/prisma';
+import { Tenant } from '../models';
 
 export class TenantRepository {
   static async findBySlug(slug: string) {
-    return prisma.tenant.findUnique({
-      where: { slug },
-    });
+    return Tenant.findOne({ slug }).lean();
   }
 
   static async create(data: any) {
-    return prisma.tenant.create({
-      data,
-    });
+    return Tenant.create(data);
   }
 
   static async findById(id: string) {
-    return prisma.tenant.findUnique({
-      where: { id },
-    });
+    return Tenant.findById(id).lean();
   }
 }

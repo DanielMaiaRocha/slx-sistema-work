@@ -1,19 +1,15 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import os from 'os';
-import prisma from '../config/prisma';
+import { Media } from '../models';
 
 export class PDFService {
-  // Delete a cached PDF from the Media table
   static async deleteInspectionPDF(inspectionId: string) {
     try {
-      // Delete any media that was stored as the PDF for this inspection
       const pdfFilename = `vistoria_${inspectionId}.pdf`;
-      const existing = await prisma.media.findFirst({
-        where: { filename: pdfFilename },
-      });
+      const existing: any = await Media.findOne({ filename: pdfFilename }).lean();
       if (existing) {
-        await prisma.media.delete({ where: { id: existing.id } });
+        await Media.deleteOne({ _id: existing._id });
         console.log(`Deleted cached PDF for inspection ${inspectionId}`);
       }
     } catch (err) {
@@ -21,16 +17,14 @@ export class PDFService {
     }
   }
 
-  // Resolve a URL to base64 data: either from the Media table or via network
   private static async resolveToBase64(photoUrl: string): Promise<string> {
     const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
     if (!photoUrl) return placeholder;
 
-    // If the URL points to our media endpoint, read directly from the DB
     const mediaMatch = photoUrl.match(/\/api\/media\/([a-zA-Z0-9_-]+)/);
     if (mediaMatch) {
       try {
-        const media = await prisma.media.findUnique({ where: { id: mediaMatch[1] } });
+        const media: any = await Media.findById(mediaMatch[1]).lean();
         if (media) {
           const base64 = Buffer.from(media.data).toString('base64');
           return `data:${media.mimeType};base64,${base64}`;
@@ -64,13 +58,10 @@ export class PDFService {
   static async generateInspectionPDF(inspection: any, branding: any) {
     const pdfFilename = `vistoria_${inspection.id}.pdf`;
 
-    // 1. Check if a cached PDF already exists in the Media table
-    const existingPdf = await prisma.media.findFirst({
-      where: { filename: pdfFilename },
-    });
+    const existingPdf: any = await Media.findOne({ filename: pdfFilename }).lean();
     if (existingPdf) {
       console.log(`PDF already exists for inspection ${inspection.id}, returning cached.`);
-      return `/api/media/${existingPdf.id}`;
+      return `/api/media/${existingPdf._id}`;
     }
 
     // 2. Collect all image URLs and pre-fetch to Base64 in parallel
@@ -301,17 +292,14 @@ export class PDFService {
 
       await browser.close();
 
-      // Save the PDF to the Media table
-      const media = await prisma.media.create({
-        data: {
-          filename: pdfFilename,
-          mimeType: 'application/pdf',
-          data: Buffer.from(pdfBuffer),
-          size: pdfBuffer.length,
-        },
+      const media: any = await Media.create({
+        filename: pdfFilename,
+        mimeType: 'application/pdf',
+        data: Buffer.from(pdfBuffer),
+        size: pdfBuffer.length,
       });
-      
-      return `/api/media/${media.id}`;
+
+      return `/api/media/${media._id}`;
     } catch (error) {
       console.error('PDFService.generateInspectionPDF error:', error);
       await browser.close();

@@ -1,29 +1,19 @@
-import prisma from '../config/prisma';
-import { User, Role } from '@prisma/client';
+import { User } from '../models';
 
 export class UserRepository {
   static async findByEmail(email: string) {
-    return prisma.user.findFirst({
-      where: { email, deletedAt: null },
-    });
+    return User.findOne({ email, deletedAt: null }).lean();
   }
 
   static async create(data: any) {
-    return prisma.user.create({
-      data,
-    });
+    return User.create(data);
   }
 
   static async findById(id: string) {
-    return prisma.user.findFirst({
-      where: { id, deletedAt: null },
-    });
+    return User.findOne({ _id: id, deletedAt: null }).lean();
   }
 
   static async update(id: string, data: any) {
-    return prisma.user.update({
-      where: { id },
-      data,
-    });
+    return User.findByIdAndUpdate(id, data, { new: true }).lean();
   }
 }

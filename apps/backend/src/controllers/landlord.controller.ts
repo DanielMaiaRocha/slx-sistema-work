@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../config/prisma';
+import { Property, DocumentModel } from '../models';
 
 export class LandlordController {
   static async getProperties(req: Request, res: Response) {
@@ -7,13 +7,11 @@ export class LandlordController {
     const tenantId = (req as any).tenantId;
 
     try {
-      const properties = await prisma.property.findMany({
-        where: {
-          landlordId: userId,
-          tenantId,
-          deletedAt: null
-        }
-      });
+      const properties = await Property.find({
+        landlordId: userId,
+        tenantId,
+        deletedAt: null,
+      }).lean();
 
       res.json(properties);
     } catch (error: any) {
@@ -27,20 +25,14 @@ export class LandlordController {
     const tenantId = (req as any).tenantId;
 
     try {
-      // Find documents linked to this landlord user
-      const documents = await prisma.document.findMany({
-        where: {
-          userId,
-          tenantId,
-          visibility: {
-            in: ['LANDLORD', 'ALL']
-          },
-          deletedAt: null
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      const documents = await DocumentModel.find({
+        userId,
+        tenantId,
+        visibility: { $in: ['LANDLORD', 'ALL'] },
+        deletedAt: null,
+      })
+        .sort({ createdAt: -1 })
+        .lean();
 
       res.json(documents);
     } catch (error: any) {

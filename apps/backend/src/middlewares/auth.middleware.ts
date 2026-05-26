@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { Role } from '@prisma/client';
+import { Role, RoleType } from '../models';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
-export const authMiddleware = (roles: Role[] = [], requiredPermission?: string) => {
+export const authMiddleware = (roles: RoleType[] = [], requiredPermission?: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
 

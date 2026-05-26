@@ -1,18 +1,72 @@
 import { Request, Response } from 'express';
-import prisma from '../config/prisma';
+import {
+  Inspection,
+  InspectionRoom,
+  InspectionItem,
+  InspectionPhoto,
+  InspectionVideo,
+  Tenant,
+  User,
+} from '../models';
 import { PDFService } from '../services/pdf.service';
+
+async function loadInspectionWithChildren(id: string) {
+  const inspection: any = await Inspection.findById(id).lean();
+  if (!inspection) return null;
+
+  const rooms: any[] = await InspectionRoom.find({ inspectionId: id }).sort({ order: 1 }).lean();
+  const roomIds = rooms.map((r) => r._id);
+
+  const [items, roomPhotos, roomVideos] = await Promise.all([
+    InspectionItem.find({ roomId: { $in: roomIds } }).lean(),
+    InspectionPhoto.find({ roomId: { $in: roomIds }, itemId: null }).lean(),
+    InspectionVideo.find({ roomId: { $in: roomIds }, itemId: null }).lean(),
+  ]);
+
+  const itemIds = items.map((i: any) => i._id);
+  const [itemPhotos, itemVideos] = await Promise.all([
+    InspectionPhoto.find({ itemId: { $in: itemIds } }).lean(),
+    InspectionVideo.find({ itemId: { $in: itemIds } }).lean(),
+  ]);
+
+  const itemsByRoom = new Map<string, any[]>();
+  for (const it of items) {
+    const list = itemsByRoom.get(it.roomId) || [];
+    const itemPhotosForItem = itemPhotos.filter((p: any) => p.itemId === it._id);
+    const itemVideosForItem = itemVideos.filter((v: any) => v.itemId === it._id);
+    list.push({ ...it, id: it._id, photos: itemPhotosForItem.map((p: any) => ({ ...p, id: p._id })), videos: itemVideosForItem.map((v: any) => ({ ...v, id: v._id })) });
+    itemsByRoom.set(it.roomId, list);
+  }
+
+  const roomsHydrated = rooms.map((r: any) => ({
+    ...r,
+    id: r._id,
+    items: itemsByRoom.get(r._id) || [],
+    photos: roomPhotos.filter((p: any) => p.roomId === r._id).map((p: any) => ({ ...p, id: p._id })),
+    videos: roomVideos.filter((v: any) => v.roomId === r._id).map((v: any) => ({ ...v, id: v._id })),
+  }));
+
+  return { ...inspection, id: inspection._id, rooms: roomsHydrated };
+}
 
 export class InspectionController {
   static async listAll(req: Request, res: Response) {
     try {
-      const inspections = await prisma.inspection.findMany({
-        where: { tenantId: req.tenantId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { name: true } }
-        }
-      });
-      res.json(inspections);
+      const inspections: any[] = await Inspection.find({ tenantId: req.tenantId })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const userIds = [...new Set(inspections.map((i) => i.userId))];
+      const users: any[] = await User.find({ _id: { $in: userIds } }).select({ _id: 1, name: 1 }).lean();
+      const userById = new Map(users.map((u) => [u._id, u]));
+
+      const enriched = inspections.map((i) => ({
+        ...i,
+        id: i._id,
+        user: userById.get(i.userId) ? { name: userById.get(i.userId).name } : null,
+      }));
+
+      res.json(enriched);
     } catch (error) {
       console.error('InspectionController.listAll error:', error);
       res.status(500).json({ error: 'Erro ao buscar vistorias.' });
@@ -22,27 +76,8 @@ export class InspectionController {
   static async getById(req: Request, res: Response) {
     const id = req.params.id as string;
     try {
-      const inspection = await prisma.inspection.findUnique({
-        where: { id },
-        include: {
-          rooms: {
-            include: {
-              items: {
-                include: {
-                  photos: true,
-                  videos: true
-                }
-              },
-              photos: true,
-              videos: true
-            },
-            orderBy: { order: 'asc' }
-          }
-        }
-      });
-
+      const inspection = await loadInspectionWithChildren(id);
       if (!inspection) return res.status(404).json({ error: 'Vistoria não encontrada.' });
-      
       res.json(inspection);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao buscar vistoria.' });
@@ -52,60 +87,46 @@ export class InspectionController {
   static async create(req: Request, res: Response) {
     const { propertyAddress, propertyNumber, cep, propertyType, landlordData, tenantData, inspectorData, status } = req.body;
     try {
-      const inspection = await prisma.inspection.create({
-        data: {
-          propertyAddress,
-          propertyNumber,
-          cep,
-          propertyType,
-          landlordData: typeof landlordData === 'object' ? JSON.stringify(landlordData) : landlordData,
-          tenantData: typeof tenantData === 'object' ? JSON.stringify(tenantData) : tenantData,
-          inspectorData: typeof inspectorData === 'object' ? JSON.stringify(inspectorData) : inspectorData,
-          status: status || 'DRAFT',
-          tenantId: req.tenantId,
-          userId: (req as any).user.id,
-        }
+      const inspection: any = await Inspection.create({
+        propertyAddress,
+        propertyNumber,
+        cep,
+        propertyType,
+        landlordData: typeof landlordData === 'object' ? JSON.stringify(landlordData) : landlordData,
+        tenantData: typeof tenantData === 'object' ? JSON.stringify(tenantData) : tenantData,
+        inspectorData: typeof inspectorData === 'object' ? JSON.stringify(inspectorData) : inspectorData,
+        status: status || 'DRAFT',
+        tenantId: req.tenantId,
+        userId: (req as any).user.id,
       });
       res.json(inspection);
     } catch (error: any) {
       console.error('InspectionController.create error:', error);
-      res.status(500).json({ 
-        error: 'Erro ao criar vistoria.', 
+      res.status(500).json({
+        error: 'Erro ao criar vistoria.',
         details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
   }
 
   static async update(req: Request, res: Response) {
     const id = req.params.id as string;
-    const { propertyAddress, propertyNumber, cep, propertyType, landlordData, tenantData, inspectorData, status, rooms } = req.body;
+    const { propertyAddress, propertyNumber, cep, propertyType, landlordData, tenantData, inspectorData, status } = req.body;
 
     try {
-      // Basic update
-      await prisma.inspection.update({
-        where: { id },
-        data: {
-          propertyAddress,
-          propertyNumber,
-          cep,
-          propertyType,
-          landlordData: typeof landlordData === 'object' ? JSON.stringify(landlordData) : landlordData,
-          tenantData: typeof tenantData === 'object' ? JSON.stringify(tenantData) : tenantData,
-          inspectorData: typeof inspectorData === 'object' ? JSON.stringify(inspectorData) : inspectorData,
-          status
-        }
+      await Inspection.findByIdAndUpdate(id, {
+        propertyAddress,
+        propertyNumber,
+        cep,
+        propertyType,
+        landlordData: typeof landlordData === 'object' ? JSON.stringify(landlordData) : landlordData,
+        tenantData: typeof tenantData === 'object' ? JSON.stringify(tenantData) : tenantData,
+        inspectorData: typeof inspectorData === 'object' ? JSON.stringify(inspectorData) : inspectorData,
+        status,
       });
 
-      // Handle rooms if provided
-      if (rooms && Array.isArray(rooms)) {
-        // This is complex, for simplicity we might just clear and recreate or do a diff
-        // For a "production-ready" autosave, we usually update specific parts.
-        // Let's implement a simpler "Save All" for now.
-      }
-
       await PDFService.deleteInspectionPDF(id);
-
       res.json({ message: 'Vistoria atualizada com sucesso.' });
     } catch (error) {
       res.status(500).json({ error: 'Erro ao atualizar vistoria.' });
@@ -116,13 +137,7 @@ export class InspectionController {
     const inspectionId = req.params.inspectionId as string;
     const { name, order } = req.body;
     try {
-      const room = await prisma.inspectionRoom.create({
-        data: {
-          name,
-          order: order || 0,
-          inspectionId
-        }
-      });
+      const room = await InspectionRoom.create({ name, order: order || 0, inspectionId });
       await PDFService.deleteInspectionPDF(inspectionId);
       res.json(room);
     } catch (error) {
@@ -134,10 +149,8 @@ export class InspectionController {
     const roomId = req.params.roomId as string;
     const { name, order } = req.body;
     try {
-      const room = await prisma.inspectionRoom.update({
-        where: { id: roomId },
-        data: { name, order }
-      });
+      const room: any = await InspectionRoom.findByIdAndUpdate(roomId, { name, order }, { new: true }).lean();
+      if (!room) return res.status(404).json({ error: 'Cômodo não encontrado.' });
       await PDFService.deleteInspectionPDF(room.inspectionId);
       res.json(room);
     } catch (error) {
@@ -148,22 +161,15 @@ export class InspectionController {
   static async deleteRoom(req: Request, res: Response) {
     const roomId = req.params.roomId as string;
     try {
-      const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
+      const room: any = await InspectionRoom.findById(roomId).lean();
       if (room) {
-        const items = await prisma.inspectionItem.findMany({
-          where: { roomId },
-          select: { id: true },
-        });
-        const itemIds = items.map((i) => i.id);
+        const items: any[] = await InspectionItem.find({ roomId }).select({ _id: 1 }).lean();
+        const itemIds = items.map((i) => i._id);
 
-        await prisma.inspectionPhoto.deleteMany({
-          where: { OR: [{ roomId }, { itemId: { in: itemIds } }] },
-        });
-        await prisma.inspectionVideo.deleteMany({
-          where: { OR: [{ roomId }, { itemId: { in: itemIds } }] },
-        });
-        await prisma.inspectionItem.deleteMany({ where: { roomId } });
-        await prisma.inspectionRoom.delete({ where: { id: roomId } });
+        await InspectionPhoto.deleteMany({ $or: [{ roomId }, { itemId: { $in: itemIds } }] });
+        await InspectionVideo.deleteMany({ $or: [{ roomId }, { itemId: { $in: itemIds } }] });
+        await InspectionItem.deleteMany({ roomId });
+        await InspectionRoom.deleteOne({ _id: roomId });
 
         await PDFService.deleteInspectionPDF(room.inspectionId);
       }
@@ -177,13 +183,9 @@ export class InspectionController {
     const roomId = req.params.roomId as string;
     const { description, status, observations, videoUrl } = req.body;
     try {
-      const item = await prisma.inspectionItem.create({
-        data: { description, status, observations, videoUrl, roomId }
-      });
-      const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
-      if (room) {
-        await PDFService.deleteInspectionPDF(room.inspectionId);
-      }
+      const item = await InspectionItem.create({ description, status, observations, videoUrl, roomId });
+      const room: any = await InspectionRoom.findById(roomId).lean();
+      if (room) await PDFService.deleteInspectionPDF(room.inspectionId);
       res.json(item);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao adicionar item.' });
@@ -194,14 +196,14 @@ export class InspectionController {
     const itemId = req.params.itemId as string;
     const { description, status, observations, videoUrl } = req.body;
     try {
-      const item = await prisma.inspectionItem.update({
-        where: { id: itemId },
-        data: { description, status, observations, videoUrl }
-      });
-      const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
-      if (room) {
-        await PDFService.deleteInspectionPDF(room.inspectionId);
-      }
+      const item: any = await InspectionItem.findByIdAndUpdate(
+        itemId,
+        { description, status, observations, videoUrl },
+        { new: true }
+      ).lean();
+      if (!item) return res.status(404).json({ error: 'Item não encontrado.' });
+      const room: any = await InspectionRoom.findById(item.roomId).lean();
+      if (room) await PDFService.deleteInspectionPDF(room.inspectionId);
       res.json(item);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao atualizar item.' });
@@ -211,16 +213,14 @@ export class InspectionController {
   static async deleteItem(req: Request, res: Response) {
     const itemId = req.params.itemId as string;
     try {
-      const item = await prisma.inspectionItem.findUnique({ where: { id: itemId } });
+      const item: any = await InspectionItem.findById(itemId).lean();
       if (item) {
-        await prisma.inspectionPhoto.deleteMany({ where: { itemId } });
-        await prisma.inspectionVideo.deleteMany({ where: { itemId } });
-        await prisma.inspectionItem.delete({ where: { id: itemId } });
+        await InspectionPhoto.deleteMany({ itemId });
+        await InspectionVideo.deleteMany({ itemId });
+        await InspectionItem.deleteOne({ _id: itemId });
 
-        const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
-        if (room) {
-          await PDFService.deleteInspectionPDF(room.inspectionId);
-        }
+        const room: any = await InspectionRoom.findById(item.roomId).lean();
+        if (room) await PDFService.deleteInspectionPDF(room.inspectionId);
       }
       res.json({ message: 'Item removido.' });
     } catch (error) {
@@ -231,29 +231,21 @@ export class InspectionController {
   static async generatePdf(req: Request, res: Response) {
     const id = req.params.id as string;
     try {
-      const inspection = await prisma.inspection.findUnique({
-        where: { id },
-        include: {
-          rooms: { 
-            include: { 
-              items: { include: { photos: true, videos: true } }, 
-              photos: true 
-            }, 
-            orderBy: { order: 'asc' } 
-          },
-          user: { select: { name: true, creci: true } }
-        }
-      });
-
+      const inspection: any = await loadInspectionWithChildren(id);
       if (!inspection) return res.status(404).json({ error: 'Vistoria não encontrada.' });
 
-      const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
-      const branding = tenant ? { 
-        name: tenant.name, 
-        logoUrl: tenant.logoUrl, 
-        primaryColor: tenant.primaryColor,
-        config: JSON.parse(tenant.config || '{}')
-      } : {};
+      const user: any = await User.findById(inspection.userId).select({ name: 1, creci: 1 }).lean();
+      inspection.user = user ? { name: user.name, creci: user.creci } : null;
+
+      const tenant: any = await Tenant.findById(req.tenantId).lean();
+      const branding = tenant
+        ? {
+            name: tenant.name,
+            logoUrl: tenant.logoUrl,
+            primaryColor: tenant.primaryColor,
+            config: JSON.parse(tenant.config || '{}'),
+          }
+        : {};
 
       const url = await PDFService.generateInspectionPDF(inspection, branding);
       res.json({ url });

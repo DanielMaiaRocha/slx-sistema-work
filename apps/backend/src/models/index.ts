@@ -32,11 +32,19 @@ function cuid(): string {
 
 // ─── Common options for every model ──────────────────────────────────────────
 const stringIdOpts: any = {
-  _id: false,
-  id: false,
   timestamps: false,
   versionKey: false,
-  toJSON: { virtuals: false, getters: false, transform: (_doc: any, ret: any) => { delete ret.__v; return ret; } },
+  // Expose a JSON-friendly `id` field that mirrors `_id`, so frontend code
+  // that does `obj.id` keeps working without caring about the storage key.
+  toJSON: {
+    virtuals: false,
+    getters: false,
+    transform: (_doc: any, ret: any) => {
+      ret.id = ret._id;
+      delete ret.__v;
+      return ret;
+    },
+  },
   toObject: { virtuals: false, getters: false },
 };
 

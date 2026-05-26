@@ -34,26 +34,28 @@ app.use(express.json({ limit: '50mb' }));
 // Normalize every JSON response so any object with `_id` also has a sibling
 // `id`. The frontend uses `obj.id` everywhere; Mongoose .lean() returns plain
 // objects without the toJSON transform, so without this they'd be missing.
-function addIdField(value: any, seen = new WeakSet()): any {
-  if (Array.isArray(value)) return value.map((v) => addIdField(v, seen));
+function addIdField(value: any): any {
+  if (Array.isArray(value)) return value.map(addIdField);
   if (!value || typeof value !== 'object') return value;
-  if (value instanceof Date || Buffer.isBuffer(value)) return value;
-  if (seen.has(value)) return value;
-  seen.add(value);
 
-  const out: any = Array.isArray(value) ? [] : { ...value };
+  const out: any = { ...value };
   if (out._id !== undefined && out.id === undefined) {
     out.id = out._id;
   }
   for (const key of Object.keys(out)) {
-    out[key] = addIdField(out[key], seen);
+    out[key] = addIdField(out[key]);
   }
   return out;
 }
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const originalJson = res.json.bind(res);
-  res.json = (body: any) => originalJson(addIdField(body));
+  res.json = (body: any) => {
+    // Run any Mongoose / class toJSON first so we walk a plain object tree,
+    // not a Document whose fields live behind getters.
+    const plain = body === undefined ? body : JSON.parse(JSON.stringify(body));
+    return originalJson(addIdField(plain));
+  };
   next();
 });
 

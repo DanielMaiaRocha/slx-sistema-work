@@ -28,18 +28,33 @@ export class SettingsController {
         where: { id: req.tenantId }
       });
 
-      if (!tenant) return res.status(404).json({ error: 'Imobiliária não encontrada' });
+      if (!tenant) return res.status(404).json({ error: 'Imobiliária não encontrada', tenantId: req.tenantId });
+
+      let parsedConfig: any = {};
+      if (tenant.config) {
+        try {
+          parsedConfig = typeof tenant.config === 'string' ? JSON.parse(tenant.config) : tenant.config;
+        } catch (parseErr: any) {
+          console.error('SettingsController.getBranding config parse error:', parseErr, 'raw:', tenant.config);
+          parsedConfig = {};
+        }
+      }
 
       res.json({
         name: tenant.name,
         logoUrl: normalizeLogoUrl(tenant.logoUrl),
         primaryColor: tenant.primaryColor,
         secondaryColor: tenant.secondaryColor,
-        config: typeof tenant.config === 'string' ? JSON.parse(tenant.config) : (tenant.config || {})
+        config: parsedConfig
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('SettingsController.getBranding error:', error);
-      res.status(500).json({ error: 'Erro ao buscar configurações.' });
+      res.status(500).json({
+        error: 'Erro ao buscar configurações.',
+        details: error?.message,
+        code: error?.code,
+        meta: error?.meta,
+      });
     }
   }
 

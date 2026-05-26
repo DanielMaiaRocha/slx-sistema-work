@@ -148,9 +148,14 @@ export class AuthController {
           permissions: userPermissions
         } 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      res.status(500).json({ error: 'Erro ao realizar login.' });
+      res.status(500).json({
+        error: 'Erro ao realizar login.',
+        details: error?.message,
+        code: error?.code,
+        meta: error?.meta,
+      });
     }
   }
 

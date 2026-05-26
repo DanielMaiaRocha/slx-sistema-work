@@ -2,3 +2,13 @@ node_modules
 dist
 .env
 *.log
+
+# Local DB
+*.db
+*.db-journal
+
+# Local scratch / debug artifacts
+scratch/
+login.json
+last_extraction.txt
+check_casing.js

@@ -168,12 +168,9 @@ router.post('/inspections/rooms/:roomId/videos', tenantMiddleware, authMiddlewar
   }
 });
 
-// ─── Protected routes ────────────────────────────────────────────────────────
+// ─── Financial (protected) ───────────────────────────────────────────────────
 router.get('/financial/me', tenantMiddleware, authMiddleware(), FinancialController.listMyFinancials);
 router.get('/financial/invoice/:recordId', tenantMiddleware, authMiddleware(), FinancialController.getInvoiceData);
-
-router.get('/documents/me', tenantMiddleware, authMiddleware(), DocumentController.listMyDocuments);
-router.post('/documents/upload', tenantMiddleware, authMiddleware(), DocumentController.upload);
 
 // ─── Document routes ─────────────────────────────────────────────────────────
 router.get('/documents/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), DocumentController.listAll);

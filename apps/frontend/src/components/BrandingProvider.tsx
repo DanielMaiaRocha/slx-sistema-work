@@ -10,6 +10,21 @@ interface BrandingContextType {
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
+const FALLBACK_BRANDING = {
+  name: 'SLX Imobiliária',
+  logoUrl: null,
+  primaryColor: '#FACC15',
+  secondaryColor: '#000000',
+  config: {
+    theme: 'light',
+    sidebarColor: '#0a0c10',
+    textColor: '#FFFFFF',
+    welcomeMessage: 'Bem-vindo ao Painel SLX',
+    dashboard: { showBalance: true, showStats: true, showDocs: true, showQuickActions: true },
+    quickLinks: [],
+  },
+};
+
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const [branding, setBranding] = useState<any>(null);
 
@@ -19,7 +34,9 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       setBranding(data);
       applyBranding(data);
     } catch (e) {
-      console.error('Failed to load branding:', e);
+      console.error('Failed to load branding, using fallback:', e);
+      setBranding(FALLBACK_BRANDING);
+      applyBranding(FALLBACK_BRANDING);
     }
   };
 

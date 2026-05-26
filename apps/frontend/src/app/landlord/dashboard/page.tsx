@@ -2,10 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
-import { Home, MapPin, Building, ChevronRight, FileText, Calendar, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Home, MapPin, Building, ChevronRight, FileText, Calendar, CheckCircle2, TrendingUp, X, DollarSign, User as UserIcon, RefreshCw, Download } from 'lucide-react';
 import { cn, getAssetUrl } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+interface Contract {
+  id: string;
+  name: string;
+  url: string;
+  amount: number | null;
+  address: string | null;
+  duration: string | null;
+  tenantName: string | null;
+  tenantCpf: string | null;
+  createdAt: string;
+}
 
 interface Property {
   id: string;
@@ -15,12 +28,28 @@ interface Property {
   state: string;
   type: string;
   createdAt: string;
+  contract?: Contract | null;
+}
+
+// "36 meses (01/05/2026 - 01/05/2029)" → { months: 36, start: '01/05/2026', end: '01/05/2029' }
+function parseDuration(d: string | null): { months: number | null; start: string | null; end: string | null } {
+  if (!d) return { months: null, start: null, end: null };
+  const monthsMatch = d.match(/(\d+)\s*meses/i);
+  const months = monthsMatch ? Number(monthsMatch[1]) : null;
+  const range = d.match(/(\d{2}\/\d{2}\/\d{4})\s*[-–]\s*(\d{2}\/\d{2}\/\d{4})/);
+  return { months, start: range?.[1] ?? null, end: range?.[2] ?? null };
+}
+
+function formatBRL(v: number | null | undefined): string {
+  if (v == null) return '—';
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export default function LandlordDashboard() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedContract, setSelectedContract] = useState<{ property: Property; contract: Contract } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -98,42 +127,79 @@ export default function LandlordDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              {properties.map((property) => (
-                <div 
-                  key={property.id}
-                  className="group relative p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] bg-white border border-slate-200 hover:border-primary transition-all duration-500 shadow-sm hover:shadow-2xl hover:shadow-primary/5"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-start md:items-center gap-5 md:gap-8">
-                      <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] flex items-center justify-center text-slate-400 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-500 shadow-sm shrink-0">
-                        <Home className="w-6 h-6 md:w-8 md:h-8" />
-                      </div>
-                      <div className="space-y-1.5 md:space-y-2">
-                        <h4 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tighter leading-tight group-hover:text-primary transition-colors">
-                          {property.address}
-                        </h4>
-                        <div className="flex items-center gap-2 text-slate-400 text-[10px] md:text-xs font-bold tracking-tight uppercase opacity-80">
-                          <MapPin className="w-3 md:w-3.5 h-3 md:h-3.5" />
-                          {property.neighborhood}, {property.city}
+              {properties.map((property) => {
+                const hasContract = !!property.contract;
+                const cardProps = hasContract
+                  ? {
+                      role: 'button' as const,
+                      tabIndex: 0,
+                      onClick: () => setSelectedContract({ property, contract: property.contract! }),
+                      onKeyDown: (e: React.KeyboardEvent) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedContract({ property, contract: property.contract! });
+                        }
+                      },
+                    }
+                  : {};
+                return (
+                  <div
+                    key={property.id}
+                    {...cardProps}
+                    className={cn(
+                      'group relative p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] bg-white border border-slate-200 transition-all duration-500 shadow-sm',
+                      hasContract
+                        ? 'hover:border-primary hover:shadow-2xl hover:shadow-primary/5 cursor-pointer'
+                        : 'opacity-90'
+                    )}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex items-start md:items-center gap-5 md:gap-8">
+                        <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-50 border border-slate-100 rounded-xl md:rounded-[1.5rem] flex items-center justify-center text-slate-400 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-500 shadow-sm shrink-0">
+                          <Home className="w-6 h-6 md:w-8 md:h-8" />
+                        </div>
+                        <div className="space-y-1.5 md:space-y-2">
+                          <h4 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tighter leading-tight group-hover:text-primary transition-colors">
+                            {property.address}
+                          </h4>
+                          <div className="flex items-center gap-2 text-slate-400 text-[10px] md:text-xs font-bold tracking-tight uppercase opacity-80">
+                            <MapPin className="w-3 md:w-3.5 h-3 md:h-3.5" />
+                            {property.neighborhood}, {property.city}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center md:flex-col md:items-end justify-between md:justify-center gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
-                       <div className="flex items-center gap-2 md:gap-3">
+                      <div className="flex items-center md:flex-col md:items-end justify-between md:justify-center gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
+                        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                           <span className="px-2.5 md:px-3.5 py-1 md:py-1.5 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
                             {property.type === 'RESIDENTIAL' ? 'Residencial' : 'Comercial'}
                           </span>
-                          <span className="px-2.5 md:px-3.5 py-1 md:py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg md:rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] text-emerald-500 shadow-sm">
-                            Ativo
-                          </span>
-                       </div>
-                       <button className="w-9 h-9 md:w-10 md:h-10 bg-white border border-slate-200 rounded-lg md:rounded-xl flex items-center justify-center text-slate-300 group-hover:bg-primary group-hover:border-primary group-hover:text-black transition-all shadow-sm">
-                         <ChevronRight className="w-5 h-5" />
-                       </button>
+                          {hasContract ? (
+                            <span className="px-2.5 md:px-3.5 py-1 md:py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg md:rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] text-emerald-500 shadow-sm flex items-center gap-1.5">
+                              <FileText className="w-3 h-3" /> Contrato
+                            </span>
+                          ) : (
+                            <span className="px-2.5 md:px-3.5 py-1 md:py-1.5 bg-slate-50 border border-slate-100 rounded-lg md:rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] text-slate-300">
+                              Sem contrato
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!hasContract}
+                          className={cn(
+                            'w-9 h-9 md:w-10 md:h-10 bg-white border border-slate-200 rounded-lg md:rounded-xl flex items-center justify-center transition-all shadow-sm',
+                            hasContract
+                              ? 'text-slate-300 group-hover:bg-primary group-hover:border-primary group-hover:text-black'
+                              : 'text-slate-200 cursor-not-allowed'
+                          )}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -226,6 +292,125 @@ export default function LandlordDashboard() {
            </div>
         </div>
       </section>
+
+      {/* Contract Modal */}
+      <AnimatePresence>
+        {selectedContract && (
+          <ContractModal
+            property={selectedContract.property}
+            contract={selectedContract.contract}
+            onClose={() => setSelectedContract(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ContractModal({
+  property,
+  contract,
+  onClose,
+}: {
+  property: Property;
+  contract: Contract;
+  onClose: () => void;
+}) {
+  const { months, start, end } = parseDuration(contract.duration);
+
+  const adjustment = 'Anual (12 meses)'; // Brazilian standard; parser doesn't extract this yet
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.96 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200"
+      >
+        {/* Header */}
+        <div className="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/40 flex items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Contrato vinculado</p>
+            <h3 className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tighter leading-tight">
+              {property.address}
+            </h3>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400">
+              {property.neighborhood}, {property.city}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 sm:w-10 sm:h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all shrink-0"
+            aria-label="Fechar"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 sm:p-8 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+            <Field icon={UserIcon} label="Inquilino" value={contract.tenantName ?? '—'} subtitle={contract.tenantCpf ?? undefined} />
+            <Field icon={DollarSign} label="Valor do aluguel" value={formatBRL(contract.amount)} subtitle="por mês" />
+            <Field icon={Calendar} label="Início" value={start ?? '—'} />
+            <Field icon={Calendar} label="Renovação / Fim" value={end ?? '—'} subtitle={end ? 'data de término' : undefined} />
+            <Field icon={FileText} label="Vigência" value={months ? `${months} meses` : (contract.duration ?? '—')} />
+            <Field icon={RefreshCw} label="Reajuste" value={adjustment} subtitle="padrão Brasil" />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+            <a
+              href={getAssetUrl(contract.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-3.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+            >
+              <FileText className="w-4 h-4" />
+              Visualizar contrato
+            </a>
+            <a
+              href={getAssetUrl(contract.url)}
+              download={contract.name}
+              className="flex-1 py-3.5 yellow-button text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Baixar
+            </a>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Field({
+  icon: Icon,
+  label,
+  value,
+  subtitle,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-100">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-3.5 h-3.5 text-slate-400" />
+        <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">{label}</span>
+      </div>
+      <p className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight leading-tight">{value}</p>
+      {subtitle && <p className="text-[10px] font-bold text-slate-300 mt-1">{subtitle}</p>}
     </div>
   );
 }

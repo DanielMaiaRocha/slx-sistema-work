@@ -1,11 +1,9 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import routes from './routes';
 
 const app = express();
 
-// Configure CORS with specific origins
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     const allowedOrigins = [
@@ -33,7 +31,31 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 
-// Media is now served from the database via /api/media/:id route
+// Normalize every JSON response so any object with `_id` also has a sibling
+// `id`. The frontend uses `obj.id` everywhere; Mongoose .lean() returns plain
+// objects without the toJSON transform, so without this they'd be missing.
+function addIdField(value: any, seen = new WeakSet()): any {
+  if (Array.isArray(value)) return value.map((v) => addIdField(v, seen));
+  if (!value || typeof value !== 'object') return value;
+  if (value instanceof Date || Buffer.isBuffer(value)) return value;
+  if (seen.has(value)) return value;
+  seen.add(value);
+
+  const out: any = Array.isArray(value) ? [] : { ...value };
+  if (out._id !== undefined && out.id === undefined) {
+    out.id = out._id;
+  }
+  for (const key of Object.keys(out)) {
+    out[key] = addIdField(out[key], seen);
+  }
+  return out;
+}
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body: any) => originalJson(addIdField(body));
+  next();
+});
 
 app.use('/api', routes);
 

@@ -67,9 +67,8 @@ export default function ViewInspectionPage() {
     setIsGenerating(true);
     try {
       const response = await fetchApi(`/inspections/${id}/pdf`, { method: 'GET' });
-      // The backend should return a URL or trigger a download
       if (response.url) {
-        window.open(response.url, '_blank');
+        window.open(getAssetUrl(response.url), '_blank');
       } else {
         toast.error('PDF em geração, aguarde um momento...');
       }

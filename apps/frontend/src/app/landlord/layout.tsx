@@ -14,7 +14,8 @@ import {
   FolderOpen
 } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, getAssetUrl } from '@/lib/utils';
+import { useBranding } from '@/components/BrandingProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LandlordLayout({ children }: { children: React.ReactNode }) {
@@ -54,7 +55,8 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
   ];
 
   const userName = Cookies.get('user_name') || 'Proprietário';
-  const tenantLogo = Cookies.get('tenant_logo');
+  const { branding } = useBranding();
+  const tenantLogo = branding?.logoUrl;
 
   return (
     <div className="min-h-screen bg-white flex flex-col md:flex-row font-sans selection:bg-primary selection:text-black">
@@ -63,7 +65,7 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
         <div className="p-10 border-b border-white/5 flex flex-col items-center gap-6">
            <div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center p-4 shadow-2xl shadow-primary/10 overflow-hidden">
               {tenantLogo ? (
-                <img src={tenantLogo} alt="Logo" className="w-full h-full object-contain" />
+                <img src={getAssetUrl(tenantLogo)} alt="Logo" className="w-full h-full object-contain" />
               ) : (
                 <div className="text-black font-black text-2xl tracking-tighter">SLX</div>
               )}
@@ -117,7 +119,7 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
            <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center p-2.5 shadow-xl shadow-slate-200/50 overflow-hidden">
                  {tenantLogo ? (
-                   <img src={tenantLogo} alt="Logo" className="w-full h-full object-contain" />
+                   <img src={getAssetUrl(tenantLogo)} alt="Logo" className="w-full h-full object-contain" />
                  ) : (
                    <span className="text-black font-black text-xs">SLX</span>
                  )}

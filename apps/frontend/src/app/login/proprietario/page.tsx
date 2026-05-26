@@ -53,9 +53,9 @@ export default function LandlordLoginPage() {
       // Also set legacy individual cookies if needed for other parts of the app
       Cookies.set('user_role', response.user.role, cookieOptions);
       Cookies.set('user_name', response.user.name, cookieOptions);
-      if (response.user.tenant?.logoUrl) {
-        Cookies.set('tenant_logo', response.user.tenant.logoUrl, cookieOptions);
-      }
+      // tenant_logo is no longer cookie-stored: the logo can be a >1MB
+      // base64 data URI, which exceeds the cookie size limit and fails
+      // silently. Layouts read it from BrandingProvider instead.
       
       toast.success('Login realizado com sucesso!');
       

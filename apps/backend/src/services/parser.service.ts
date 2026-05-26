@@ -17,7 +17,7 @@ export class ParserService {
           return {};
         }
         console.log('🤖 [AUTO PARSER] Reading from DB, media id:', media._id);
-        dataBuffer = Buffer.from(media.data);
+        dataBuffer = Buffer.isBuffer(media.data) ? media.data : (media.data?.buffer ?? Buffer.from(media.data ?? []));
       } else {
         // Legacy: read from filesystem for old /uploads/ URLs
         let targetPath = fileUrl;

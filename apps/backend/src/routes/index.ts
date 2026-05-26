@@ -25,17 +25,27 @@ async function saveFileToMedia(file: Express.Multer.File): Promise<string> {
 }
 
 // ─── Serve media from DB ─────────────────────────────────────────────────────
+// Note: with .lean(), Mongoose returns the data field as a BSON Binary object
+// whose real bytes live in `.buffer` (Buffer). With a hydrated doc it's already
+// a Buffer. Always extract via the helper below.
+function bufferFromMediaData(data: any): Buffer {
+  if (Buffer.isBuffer(data)) return data;
+  if (data && Buffer.isBuffer(data.buffer)) return data.buffer;
+  return Buffer.from(data ?? []);
+}
+
 router.get('/media/:id', async (req: Request, res: Response) => {
   try {
     const media: any = await Media.findById(req.params.id as string).lean();
     if (!media) return res.status(404).json({ error: 'Arquivo não encontrado' });
 
+    const buf = bufferFromMediaData(media.data);
     res.set({
       'Content-Type': media.mimeType,
-      'Content-Length': String(media.size),
+      'Content-Length': String(buf.length),
       'Cache-Control': 'public, max-age=31536000, immutable',
     });
-    res.send(Buffer.from(media.data));
+    res.send(buf);
   } catch (error) {
     console.error('Media serve error:', error);
     res.status(500).json({ error: 'Erro ao servir arquivo' });

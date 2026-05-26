@@ -26,7 +26,8 @@ export class PDFService {
       try {
         const media: any = await Media.findById(mediaMatch[1]).lean();
         if (media) {
-          const base64 = Buffer.from(media.data).toString('base64');
+          const buf = Buffer.isBuffer(media.data) ? media.data : (media.data?.buffer ?? Buffer.from(media.data ?? []));
+          const base64 = buf.toString('base64');
           return `data:${media.mimeType};base64,${base64}`;
         }
       } catch (err) {

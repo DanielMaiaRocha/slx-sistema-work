@@ -140,8 +140,9 @@ export class InspectionController {
       const room = await InspectionRoom.create({ name, order: order || 0, inspectionId });
       await PDFService.deleteInspectionPDF(inspectionId);
       res.json(room);
-    } catch (error) {
-      res.status(500).json({ error: 'Erro ao adicionar cômodo.' });
+    } catch (error: any) {
+      console.error('addRoom error:', error);
+      res.status(500).json({ error: 'Erro ao adicionar cômodo.', details: error?.message, code: error?.code });
     }
   }
 
@@ -187,8 +188,9 @@ export class InspectionController {
       const room: any = await InspectionRoom.findById(roomId).lean();
       if (room) await PDFService.deleteInspectionPDF(room.inspectionId);
       res.json(item);
-    } catch (error) {
-      res.status(500).json({ error: 'Erro ao adicionar item.' });
+    } catch (error: any) {
+      console.error('addItem error:', error);
+      res.status(500).json({ error: 'Erro ao adicionar item.', details: error?.message, code: error?.code });
     }
   }
 

@@ -159,7 +159,7 @@ const inspectionRoomSchema = new Schema({
 // ─── InspectionItem ──────────────────────────────────────────────────────────
 const inspectionItemSchema = new Schema({
   _id: idField,
-  description: { type: String, required: true },
+  description: { type: String, default: '' },
   observations: String,
   status: String,
   videoUrl: String,

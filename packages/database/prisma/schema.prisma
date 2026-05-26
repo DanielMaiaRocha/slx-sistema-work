@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -27,14 +27,14 @@ enum FinancialType {
 }
 
 model Tenant {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) @map("_id")
   name          String
-  slug          String   @unique // Used for subdomain (e.g. slx.imob.com)
+  slug          String   @unique
   logoUrl       String?
   primaryColor  String   @default("#6D28D9")
   secondaryColor String   @default("#06B6D4")
-  config        String?  @default("{}") // Store JSON as string for SQLite compatibility if needed, or Json for other DBs
-  
+  config        String?  @default("{}")
+
   users         User[]
   documents     Document[]
   financials    FinancialRecord[]
@@ -45,28 +45,26 @@ model Tenant {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt     DateTime?
-
-  @@index([slug])
 }
 
 model User {
-  id                String   @id @default(cuid())
+  id                String   @id @default(cuid()) @map("_id")
   email             String   @unique
   password          String
   name              String
   phone             String?
-  role              String   @default("TENANT") // Comma separated roles: "ADMIN", "TENANT", "LANDLORD", etc.
-  permissions       String?  @default("{}") // JSON string of granular permissions
+  role              String   @default("TENANT")
+  permissions       String?  @default("{}")
   cpf               String?  @unique
   isEmailVerified   Boolean  @default(false)
   photoUrl          String?
   creci             String?
-  
+
   asaasId           String?  @unique
-  
+
   tenantId          String
   tenant            Tenant   @relation(fields: [tenantId], references: [id])
-  
+
   documents         Document[]
   financials        FinancialRecord[]
   inspections       Inspection[]
@@ -78,27 +76,24 @@ model User {
   deletedAt         DateTime?
 
   @@index([tenantId])
-  @@index([asaasId])
-  @@index([email])
 }
 
 model Document {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   name      String
   url       String
-  type      String   // e.g. "CONTRACT", "RECEIPT", "ID"
-  
-  // Metadata for contracts
+  type      String
+
   amount    Float?
   address   String?
   duration  String?
-  
+
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  
+
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  visibility String?  @default("ALL") // "TENANT", "LANDLORD", "ALL"
+  visibility String?  @default("ALL")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,20 +104,20 @@ model Document {
 }
 
 model FinancialRecord {
-  id            String          @id @default(cuid())
+  id            String          @id @default(cuid()) @map("_id")
   description   String
   amount        Float
   dueDate       DateTime
   paymentDate   DateTime?
   type          FinancialType
   status        FinancialStatus @default(PENDING)
-  
-  asaasId       String?         @unique // ID from Asaas integration
-  asaasUrl      String?         // URL for the boleto/payment
-  
+
+  asaasId       String?         @unique
+  asaasUrl      String?
+
   tenantId      String
   tenant        Tenant          @relation(fields: [tenantId], references: [id])
-  
+
   userId        String
   user          User            @relation(fields: [userId], references: [id])
 
@@ -132,36 +127,30 @@ model FinancialRecord {
 
   @@index([tenantId])
   @@index([userId])
-  @@index([asaasId])
 }
 
 model Inspection {
-  id              String   @id @default(cuid())
+  id              String   @id @default(cuid()) @map("_id")
   propertyAddress String
   propertyNumber  String?
   cep             String?
-  propertyType    String?  // RESIDENTIAL, COMMERCIAL
+  propertyType    String?
   date            DateTime @default(now())
-  
-  // People
-  landlordData    String?  @default("{}") // JSON: { name, cpf, rg, profession }
-  tenantData      String?  @default("{}") // JSON: { name, cpf, rg, profession }
-  inspectorData   String?  @default("{}") // JSON: { name, creci, cpf }
-  
-  // Status
-  status          String   @default("DRAFT") // DRAFT, FINALIZED
-  
-  // Tenant Relation
+
+  landlordData    String?  @default("{}")
+  tenantData      String?  @default("{}")
+  inspectorData   String?  @default("{}")
+
+  status          String   @default("DRAFT")
+
   tenantId        String
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
-  
-  // User who created
+
   userId          String
   user            User     @relation(fields: [userId], references: [id])
-  
-  // Rooms
+
   rooms           InspectionRoom[]
-  
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
@@ -171,13 +160,13 @@ model Inspection {
 }
 
 model InspectionRoom {
-  id           String   @id @default(cuid())
-  name         String   // e.g. "Sala", "Cozinha"
+  id           String   @id @default(cuid()) @map("_id")
+  name         String
   order        Int      @default(0)
-  
+
   inspectionId String
-  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  
+  inspection   Inspection @relation(fields: [inspectionId], references: [id])
+
   items        InspectionItem[]
   photos       InspectionPhoto[]
   videos       InspectionVideo[]
@@ -186,14 +175,14 @@ model InspectionRoom {
 }
 
 model InspectionItem {
-  id            String   @id @default(cuid())
-  description   String   // e.g. "Paredes: Pintura nova, sem rachaduras"
-  observations  String?  
-  status        String?  // BOM, REGULAR, RUIM
+  id            String   @id @default(cuid()) @map("_id")
+  description   String
+  observations  String?
+  status        String?
   videoUrl      String?
-  
+
   roomId        String
-  room          InspectionRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room          InspectionRoom @relation(fields: [roomId], references: [id])
 
   photos        InspectionPhoto[]
   videos        InspectionVideo[]
@@ -202,35 +191,35 @@ model InspectionItem {
 }
 
 model InspectionPhoto {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) @map("_id")
   url           String
-  
+
   roomId        String?
-  room          InspectionRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room          InspectionRoom? @relation(fields: [roomId], references: [id])
 
   itemId        String?
-  item          InspectionItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item          InspectionItem? @relation(fields: [itemId], references: [id])
 
   @@index([roomId])
   @@index([itemId])
 }
 
 model InspectionVideo {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) @map("_id")
   url           String
-  
+
   roomId        String?
-  room          InspectionRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room          InspectionRoom? @relation(fields: [roomId], references: [id])
 
   itemId        String?
-  item          InspectionItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item          InspectionItem? @relation(fields: [itemId], references: [id])
 
   @@index([roomId])
   @@index([itemId])
 }
 
 model Property {
-  id              String   @id @default(cuid())
+  id              String   @id @default(cuid()) @map("_id")
   address         String
   number          String?
   complement      String?
@@ -238,11 +227,11 @@ model Property {
   city            String?
   state           String?
   zipCode         String?
-  type            String?  // RESIDENTIAL, COMMERCIAL, etc.
-  
+  type            String?
+
   landlordId      String
   landlord        User     @relation("LandlordProperties", fields: [landlordId], references: [id])
-  
+
   tenantId        String
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
 
@@ -255,13 +244,13 @@ model Property {
 }
 
 model Log {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   action    String
   details   String?
-  
+
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  
+
   userId    String
   user      User     @relation(fields: [userId], references: [id])
 
@@ -272,7 +261,7 @@ model Log {
 }
 
 model Media {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   filename  String
   mimeType  String
   data      Bytes

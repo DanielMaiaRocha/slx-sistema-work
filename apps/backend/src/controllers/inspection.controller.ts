@@ -150,7 +150,21 @@ export class InspectionController {
     try {
       const room = await prisma.inspectionRoom.findUnique({ where: { id: roomId } });
       if (room) {
+        const items = await prisma.inspectionItem.findMany({
+          where: { roomId },
+          select: { id: true },
+        });
+        const itemIds = items.map((i) => i.id);
+
+        await prisma.inspectionPhoto.deleteMany({
+          where: { OR: [{ roomId }, { itemId: { in: itemIds } }] },
+        });
+        await prisma.inspectionVideo.deleteMany({
+          where: { OR: [{ roomId }, { itemId: { in: itemIds } }] },
+        });
+        await prisma.inspectionItem.deleteMany({ where: { roomId } });
         await prisma.inspectionRoom.delete({ where: { id: roomId } });
+
         await PDFService.deleteInspectionPDF(room.inspectionId);
       }
       res.json({ message: 'Cômodo removido.' });
@@ -199,7 +213,10 @@ export class InspectionController {
     try {
       const item = await prisma.inspectionItem.findUnique({ where: { id: itemId } });
       if (item) {
+        await prisma.inspectionPhoto.deleteMany({ where: { itemId } });
+        await prisma.inspectionVideo.deleteMany({ where: { itemId } });
         await prisma.inspectionItem.delete({ where: { id: itemId } });
+
         const room = await prisma.inspectionRoom.findUnique({ where: { id: item.roomId } });
         if (room) {
           await PDFService.deleteInspectionPDF(room.inspectionId);

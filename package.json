@@ -13,7 +13,7 @@
     "start:backend": "npm run start -w backend",
     "build:frontend": "npm run build -w frontend",
     "start:frontend": "npm run start -w frontend",
-    "prisma:generate": "node scripts/prepare-prisma.js && prisma generate --schema=packages/database/prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema=packages/database/prisma/schema.prisma",
     "postinstall": "npm run prisma:generate"
   },
   "devDependencies": {

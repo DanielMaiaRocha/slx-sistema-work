@@ -7,8 +7,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
-COPY packages ./packages/
-# Ignoramos scripts para evitar falha no postinstall (prisma generate)
 RUN npm install --ignore-scripts
 
 # 2. Reconstruir o código-fonte apenas quando necessário

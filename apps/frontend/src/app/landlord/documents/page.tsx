@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
 import { FileText, Download, FolderOpen, Search, Filter, Clock, Files } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getAssetUrl } from '@/lib/utils';
 
 interface Document {
   id: string;
@@ -108,9 +108,9 @@ export default function LandlordDocuments() {
                       </div>
                    </div>
                 </div>
-                <a 
-                  href={doc.url} 
-                  target="_blank" 
+                <a
+                  href={getAssetUrl(doc.url)}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 px-8 py-5 yellow-button text-black rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >

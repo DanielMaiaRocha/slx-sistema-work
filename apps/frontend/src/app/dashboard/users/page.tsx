@@ -4,6 +4,7 @@ import { Users, Search, Mail, MoreVertical, Shield, ChevronDown, ChevronLeft, Ch
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi } from '@/lib/api';
+import { getAssetUrl } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import ConfirmModal from '@/components/ConfirmModal';
 import Cookies from 'js-cookie';
@@ -1152,8 +1153,8 @@ export default function UsersPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <a 
-                            href={doc.url} target="_blank" rel="noopener noreferrer"
+                          <a
+                            href={getAssetUrl(doc.url)} target="_blank" rel="noopener noreferrer"
                             className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-all"
                             title="Visualizar"
                           >

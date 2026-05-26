@@ -16,7 +16,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, getAssetUrl } from '@/lib/utils';
 
 export default function TenantDashboard() {
   const [bills, setBills] = useState<any[]>([]);
@@ -229,9 +229,9 @@ export default function TenantDashboard() {
                   </div>
                 ) : (
                   documents.map((doc) => (
-                    <a 
+                    <a
                       key={doc.id}
-                      href={doc.url}
+                      href={getAssetUrl(doc.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-5 p-7 hover:bg-slate-50 transition-colors group"

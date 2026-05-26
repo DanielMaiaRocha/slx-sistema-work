@@ -13,7 +13,7 @@ import {
   FileSearch
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { cn } from '@/lib/utils';
+import { cn, getAssetUrl } from '@/lib/utils';
 
 export default function TenantContract() {
   const [contracts, setContracts] = useState<any[]>([]);
@@ -124,17 +124,18 @@ export default function TenantContract() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-6">
-                 <a 
-                  href={contract.url} 
+                 <a
+                  href={getAssetUrl(contract.url)}
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="flex-1 py-6 bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] text-slate-600 transition-all flex items-center justify-center gap-3 shadow-sm"
                 >
                     <ExternalLink className="w-5 h-5 text-slate-300" />
                     Visualizar
                  </a>
-                 <a 
-                  href={contract.url} 
-                  download
+                 <a
+                  href={getAssetUrl(contract.url)}
+                  download={contract.name}
                   className="flex-1 py-6 yellow-button text-black rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                 >
                     <Download className="w-5 h-5" />

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
+import { getAssetUrl } from '@/lib/utils';
 import { FolderOpen, FileText, ExternalLink, Shield, Download, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Cookies from 'js-cookie';
@@ -123,9 +124,9 @@ export default function DocumentsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <a 
-                  href={doc.url} 
-                  target="_blank" 
+                <a
+                  href={getAssetUrl(doc.url)}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="w-14 h-14 bg-white border border-slate-100 text-slate-400 hover:text-black hover:border-primary hover:bg-primary rounded-2xl transition-all shadow-sm flex items-center justify-center hover:scale-110 active:scale-95"
                   title="Abrir Documento"

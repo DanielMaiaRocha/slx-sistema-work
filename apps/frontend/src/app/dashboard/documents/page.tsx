@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { fetchApi } from '@/lib/api';
+import { getAssetUrl } from '@/lib/utils';
 import { FileText, Search, Download, Trash2, Eye, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -99,11 +100,11 @@ export default function DocumentsPage() {
                   <FileText className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
                 <div className="flex items-center gap-1">
-                  <a 
-                    href={doc.url} 
-                    target="_blank" 
+                  <a
+                    href={getAssetUrl(doc.url)}
+                    target="_blank"
                     rel="noopener noreferrer"
-                    title="Visualizar" 
+                    title="Visualizar"
                     className="p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
                   >
                     <Eye className="w-4 h-4" />
@@ -131,9 +132,9 @@ export default function DocumentsPage() {
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   {new Date(doc.createdAt).toLocaleDateString('pt-BR')} • {doc.type || 'DOCUMENTO'}
                 </span>
-                <a 
-                  href={doc.url}
-                  download
+                <a
+                  href={getAssetUrl(doc.url)}
+                  download={doc.name}
                   className="text-primary hover:text-black text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />

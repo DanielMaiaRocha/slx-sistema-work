@@ -21,7 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
@@ -34,10 +34,10 @@ interface Room {
   id: string;
   dbId?: string; // ID in the database
   name: string;
-  items: { 
-    id: string; 
-    dbId?: string; 
-    description: string; 
+  items: {
+    id: string;
+    dbId?: string;
+    description: string;
     status: string;
     observations?: string;
     videoUrl?: string;
@@ -48,6 +48,8 @@ interface Room {
   isExpanded?: boolean;
 }
 
+type FileEntry = { file: File; url: string };
+
 export default function EditInspectionPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -55,8 +57,16 @@ export default function EditInspectionPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState<Record<string, File[]>>({});
-  const [videoFiles, setVideoFiles] = useState<Record<string, File[]>>({});
+  const [photoFiles, setPhotoFiles] = useState<Record<string, FileEntry[]>>({});
+  const [videoFiles, setVideoFiles] = useState<Record<string, FileEntry[]>>({});
+  const photoFilesRef = useRef(photoFiles);
+  const videoFilesRef = useRef(videoFiles);
+  useEffect(() => { photoFilesRef.current = photoFiles; }, [photoFiles]);
+  useEffect(() => { videoFilesRef.current = videoFiles; }, [videoFiles]);
+  useEffect(() => () => {
+    Object.values(photoFilesRef.current).flat().forEach(e => URL.revokeObjectURL(e.url));
+    Object.values(videoFilesRef.current).flat().forEach(e => URL.revokeObjectURL(e.url));
+  }, []);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -251,20 +261,39 @@ export default function EditInspectionPage() {
   const handlePhotoUpload = (roomId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-
-    const fileList = Array.from(files);
-    const newPreviewUrls = fileList.map(file => URL.createObjectURL(file));
-    
-    setRooms(rooms.map(r => r.id === roomId ? {
-      ...r,
-      photos: [...r.photos, ...newPreviewUrls]
-    } : r));
-
-    // Store actual files for later upload
+    const entries: FileEntry[] = Array.from(files).map(file => ({ file, url: URL.createObjectURL(file) }));
     setPhotoFiles(prev => ({
       ...prev,
-      [roomId]: [...(prev[roomId] || []), ...fileList]
+      [roomId]: [...(prev[roomId] || []), ...entries]
     }));
+    e.target.value = '';
+  };
+
+  const removeRoomPhoto = (roomId: string, idx: number) => {
+    setPhotoFiles(prev => {
+      const list = prev[roomId] || [];
+      const removed = list[idx];
+      if (removed) URL.revokeObjectURL(removed.url);
+      return { ...prev, [roomId]: list.filter((_, i) => i !== idx) };
+    });
+  };
+
+  const addItemPhotos = (itemId: string, files: File[]) => {
+    const entries: FileEntry[] = files.map(file => ({ file, url: URL.createObjectURL(file) }));
+    setPhotoFiles(prev => ({
+      ...prev,
+      [`item-${itemId}`]: [...(prev[`item-${itemId}`] || []), ...entries]
+    }));
+  };
+
+  const removeItemPhoto = (itemId: string, idx: number) => {
+    setPhotoFiles(prev => {
+      const key = `item-${itemId}`;
+      const list = prev[key] || [];
+      const removed = list[idx];
+      if (removed) URL.revokeObjectURL(removed.url);
+      return { ...prev, [key]: list.filter((_, i) => i !== idx) };
+    });
   };
 
   const removePhoto = (roomId: string, photoUrl: string) => {
@@ -325,18 +354,18 @@ export default function EditInspectionPage() {
 
           // Upload photos for this item
           const itemFiles = photoFiles[`item-${item.id}`] || [];
-          for (const file of itemFiles) {
+          for (const entry of itemFiles) {
             const photoFormData = new FormData();
-            photoFormData.append('photo', file);
+            photoFormData.append('photo', entry.file);
             photoFormData.append('itemId', itemDbId as string);
             await fetchApi(`/inspections/rooms/${roomDbId}/photos`, { method: 'POST', body: photoFormData });
           }
 
           // Upload videos for this item
           const itemVideos = videoFiles[`item-${item.id}`] || [];
-          for (const file of itemVideos) {
+          for (const entry of itemVideos) {
             const videoFormData = new FormData();
-            videoFormData.append('video', file);
+            videoFormData.append('video', entry.file);
             videoFormData.append('itemId', itemDbId as string);
             await fetchApi(`/inspections/rooms/${roomDbId}/videos`, { method: 'POST', body: videoFormData });
           }
@@ -344,10 +373,10 @@ export default function EditInspectionPage() {
 
         // Upload new photos for this room
         const filesToUpload = photoFiles[room.id] || [];
-        for (const file of filesToUpload) {
+        for (const entry of filesToUpload) {
           const photoFormData = new FormData();
-          photoFormData.append('photo', file);
-          
+          photoFormData.append('photo', entry.file);
+
           await fetchApi(`/inspections/rooms/${roomDbId}/photos`, {
             method: 'POST',
             body: photoFormData
@@ -774,8 +803,8 @@ export default function EditInspectionPage() {
                                           <input
                                             type="file" multiple accept="image/*" className="hidden"
                                             onChange={(e) => {
-                                              const files = Array.from(e.target.files || []);
-                                              setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
+                                              addItemPhotos(item.id, Array.from(e.target.files || []));
+                                              e.target.value = '';
                                             }}
                                           />
                                         </label>
@@ -785,8 +814,8 @@ export default function EditInspectionPage() {
                                           <input
                                             type="file" multiple accept="image/*" capture="environment" className="hidden"
                                             onChange={(e) => {
-                                              const files = Array.from(e.target.files || []);
-                                              setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
+                                              addItemPhotos(item.id, Array.from(e.target.files || []));
+                                              e.target.value = '';
                                             }}
                                           />
                                         </label>
@@ -806,24 +835,21 @@ export default function EditInspectionPage() {
                                               <img src={getAssetUrl(p.url)} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                                             </div>
                                           ))}
-                                          {photoFiles[`item-${item.id}`]?.map((file, idx) => (
+                                          {photoFiles[`item-${item.id}`]?.map((entry, idx) => (
                                             <div
-                                              key={`${file.name}-${idx}`}
+                                              key={entry.url}
                                               className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
-                                              onClick={() => setPreviewImage(URL.createObjectURL(file))}
+                                              onClick={() => setPreviewImage(entry.url)}
                                             >
                                               <img
-                                                src={URL.createObjectURL(file)}
+                                                src={entry.url}
                                                 className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                                onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
                                               />
                                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                 <button
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const newFiles = [...photoFiles[`item-${item.id}`]];
-                                                    newFiles.splice(idx, 1);
-                                                    setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: newFiles }));
+                                                    removeItemPhoto(item.id, idx);
                                                   }}
                                                   className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center text-white hover:bg-rose-600 transition-colors shadow-lg"
                                                 >
@@ -832,12 +858,18 @@ export default function EditInspectionPage() {
                                               </div>
                                             </div>
                                           ))}
-                                          {videoFiles[`item-${item.id}`]?.map((file, idx) => (
-                                            <div key={`v-${file.name}-${idx}`} className="h-20 px-4 rounded-xl bg-primary/10 border border-primary/20 flex flex-col items-center justify-center gap-1 relative group min-w-[100px]">
+                                          {videoFiles[`item-${item.id}`]?.map((entry) => (
+                                            <div key={entry.url} className="h-20 px-4 rounded-xl bg-primary/10 border border-primary/20 flex flex-col items-center justify-center gap-1 relative group min-w-[100px]">
                                               <Video className="w-5 h-5 text-primary" />
-                                              <span className="text-[9px] text-primary font-bold truncate max-w-[80px]">{file.name}</span>
+                                              <span className="text-[9px] text-primary font-bold truncate max-w-[80px]">{entry.file.name}</span>
                                               <button
-                                                onClick={() => setVideoFiles(prev => ({ ...prev, [`item-${item.id}`]: [] }))}
+                                                onClick={() => setVideoFiles(prev => {
+                                                  const key = `item-${item.id}`;
+                                                  (prev[key] || []).forEach(e => URL.revokeObjectURL(e.url));
+                                                  const next = { ...prev };
+                                                  delete next[key];
+                                                  return next;
+                                                })}
                                                 className="absolute top-1 right-1 bg-rose-500 text-white rounded-md p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-600"
                                               >
                                                 <X className="w-3 h-3" />
@@ -884,11 +916,11 @@ export default function EditInspectionPage() {
                             </div>
 
                             {/* Room photo previews (existing + new) */}
-                            {room.photos.length > 0 && (
+                            {(room.photos.length > 0 || (photoFiles[room.id]?.length ?? 0) > 0) && (
                               <div className="flex flex-wrap gap-2.5">
                                 {room.photos.map((photo, pIdx) => (
                                   <div
-                                    key={pIdx}
+                                    key={`existing-${pIdx}`}
                                     className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
                                     onClick={() => setPreviewImage(getAssetUrl(photo))}
                                   >
@@ -899,6 +931,25 @@ export default function EditInspectionPage() {
                                     />
                                     <button
                                       onClick={(e) => { e.stopPropagation(); removePhoto(room.id, photo); }}
+                                      className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                                {photoFiles[room.id]?.map((entry, idx) => (
+                                  <div
+                                    key={entry.url}
+                                    className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
+                                    onClick={() => setPreviewImage(entry.url)}
+                                  >
+                                    <img
+                                      src={entry.url}
+                                      alt="Vistoria"
+                                      className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                    />
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); removeRoomPhoto(room.id, idx); }}
                                       className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                       <X className="w-3 h-3" />

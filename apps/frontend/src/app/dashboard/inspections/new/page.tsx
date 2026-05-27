@@ -23,7 +23,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
@@ -35,9 +35,9 @@ import ImagePreviewModal from '@/components/ImagePreviewModal';
 interface Room {
   id: string;
   name: string;
-  items: { 
-    id: string; 
-    description: string; 
+  items: {
+    id: string;
+    description: string;
     status: string;
     observations?: string;
     videoUrl?: string;
@@ -48,13 +48,23 @@ interface Room {
   isExpanded?: boolean;
 }
 
+type FileEntry = { file: File; url: string };
+
 export default function NewInspectionPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState<Record<string, File[]>>({});
-  const [videoFiles, setVideoFiles] = useState<Record<string, File[]>>({});
+  const [photoFiles, setPhotoFiles] = useState<Record<string, FileEntry[]>>({});
+  const [videoFiles, setVideoFiles] = useState<Record<string, FileEntry[]>>({});
+  const photoFilesRef = useRef(photoFiles);
+  const videoFilesRef = useRef(videoFiles);
+  useEffect(() => { photoFilesRef.current = photoFiles; }, [photoFiles]);
+  useEffect(() => { videoFilesRef.current = videoFiles; }, [videoFiles]);
+  useEffect(() => () => {
+    Object.values(photoFilesRef.current).flat().forEach(e => URL.revokeObjectURL(e.url));
+    Object.values(videoFilesRef.current).flat().forEach(e => URL.revokeObjectURL(e.url));
+  }, []);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -271,26 +281,53 @@ export default function NewInspectionPage() {
   const handlePhotoUpload = (roomId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-
-    const fileList = Array.from(files);
-    const newPreviewUrls = fileList.map(file => URL.createObjectURL(file));
-    
-    setRooms(rooms.map(r => r.id === roomId ? {
-      ...r,
-      photos: [...r.photos, ...newPreviewUrls]
-    } : r));
-
+    const entries: FileEntry[] = Array.from(files).map(file => ({ file, url: URL.createObjectURL(file) }));
     setPhotoFiles(prev => ({
       ...prev,
-      [roomId]: [...(prev[roomId] || []), ...fileList]
+      [roomId]: [...(prev[roomId] || []), ...entries]
+    }));
+    // reset input so selecting the same file again triggers onChange
+    e.target.value = '';
+  };
+
+  const removeRoomPhoto = (roomId: string, idx: number) => {
+    setPhotoFiles(prev => {
+      const list = prev[roomId] || [];
+      const removed = list[idx];
+      if (removed) URL.revokeObjectURL(removed.url);
+      return { ...prev, [roomId]: list.filter((_, i) => i !== idx) };
+    });
+  };
+
+  const addItemPhotos = (itemId: string, files: File[]) => {
+    const entries: FileEntry[] = files.map(file => ({ file, url: URL.createObjectURL(file) }));
+    setPhotoFiles(prev => ({
+      ...prev,
+      [`item-${itemId}`]: [...(prev[`item-${itemId}`] || []), ...entries]
     }));
   };
 
-  const removePhoto = (roomId: string, photoUrl: string) => {
-    setRooms(rooms.map(r => r.id === roomId ? {
-      ...r,
-      photos: r.photos.filter(p => p !== photoUrl)
-    } : r));
+  const removeItemPhoto = (itemId: string, idx: number) => {
+    setPhotoFiles(prev => {
+      const key = `item-${itemId}`;
+      const list = prev[key] || [];
+      const removed = list[idx];
+      if (removed) URL.revokeObjectURL(removed.url);
+      return { ...prev, [key]: list.filter((_, i) => i !== idx) };
+    });
+  };
+
+  const setRoomVideo = (roomId: string, file: File | null) => {
+    setVideoFiles(prev => {
+      const old = prev[roomId]?.[0];
+      if (old) URL.revokeObjectURL(old.url);
+      if (!file) {
+        const next = { ...prev };
+        delete next[roomId];
+        return next;
+      }
+      return { ...prev, [roomId]: [{ file, url: URL.createObjectURL(file) }] };
+    });
   };
 
   const handleSave = async () => {
@@ -323,27 +360,27 @@ export default function NewInspectionPage() {
           });
 
           const itemFiles = photoFiles[`item-${item.id}`] || [];
-          for (const file of itemFiles) {
+          for (const entry of itemFiles) {
             const photoFormData = new FormData();
-            photoFormData.append('photo', file);
+            photoFormData.append('photo', entry.file);
             photoFormData.append('itemId', itemData.id);
             await fetchApi(`/inspections/rooms/${roomData.id}/photos`, { method: 'POST', body: photoFormData });
           }
 
           const itemVideos = videoFiles[`item-${item.id}`] || [];
-          for (const file of itemVideos) {
+          for (const entry of itemVideos) {
             const videoFormData = new FormData();
-            videoFormData.append('video', file);
+            videoFormData.append('video', entry.file);
             videoFormData.append('itemId', itemData.id);
             await fetchApi(`/inspections/rooms/${roomData.id}/videos`, { method: 'POST', body: videoFormData });
           }
         }
 
         const filesToUpload = photoFiles[room.id] || [];
-        for (const file of filesToUpload) {
+        for (const entry of filesToUpload) {
           const photoFormData = new FormData();
-          photoFormData.append('photo', file);
-          
+          photoFormData.append('photo', entry.file);
+
           await fetchApi(`/inspections/rooms/${roomData.id}/photos`, {
             method: 'POST',
             body: photoFormData
@@ -760,22 +797,22 @@ export default function NewInspectionPage() {
                                         <label className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-primary transition-all text-[9px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95">
                                           <ImageIcon className="w-3.5 h-3.5" />
                                           Galeria
-                                            <input 
+                                            <input
                                               type="file" multiple accept="image/*" className="hidden"
                                               onChange={(e) => {
-                                                const files = Array.from(e.target.files || []);
-                                                setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
+                                                addItemPhotos(item.id, Array.from(e.target.files || []));
+                                                e.target.value = '';
                                               }}
                                             />
                                           </label>
                                           <label className="flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl hover:bg-black transition-all text-[9px] font-black uppercase tracking-widest cursor-pointer shadow-md active:scale-95">
                                             <ImageIcon className="w-3.5 h-3.5" />
                                             Câmera
-                                            <input 
+                                            <input
                                               type="file" multiple accept="image/*" capture="environment" className="hidden"
                                               onChange={(e) => {
-                                                const files = Array.from(e.target.files || []);
-                                                setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: [...(prev[`item-${item.id}`] || []), ...files] }));
+                                                addItemPhotos(item.id, Array.from(e.target.files || []));
+                                                e.target.value = '';
                                               }}
                                             />
                                           </label>
@@ -786,24 +823,21 @@ export default function NewInspectionPage() {
                                     <div className="space-y-4">
                                       {(photoFiles[`item-${item.id}`]?.length > 0 || videoFiles[`item-${item.id}`]?.length > 0) && (
                                         <div className="flex flex-wrap gap-2.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
-                                          {photoFiles[`item-${item.id}`]?.map((file, idx) => (
-                                            <div 
-                                              key={`${file.name}-${idx}`} 
+                                          {photoFiles[`item-${item.id}`]?.map((entry, idx) => (
+                                            <div
+                                              key={entry.url}
                                               className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
-                                              onClick={() => setPreviewImage(URL.createObjectURL(file))}
+                                              onClick={() => setPreviewImage(entry.url)}
                                             >
-                                              <img 
-                                                src={URL.createObjectURL(file)} 
-                                                className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-                                                onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
+                                              <img
+                                                src={entry.url}
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-110"
                                               />
                                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <button 
+                                                <button
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const newFiles = [...photoFiles[`item-${item.id}`]];
-                                                    newFiles.splice(idx, 1);
-                                                    setPhotoFiles(prev => ({ ...prev, [`item-${item.id}`]: newFiles }));
+                                                    removeItemPhoto(item.id, idx);
                                                   }}
                                                   className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center text-white hover:bg-rose-600 transition-colors shadow-lg"
                                                 >
@@ -857,22 +891,22 @@ export default function NewInspectionPage() {
                                 <label className="flex items-center justify-center gap-3 py-4 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-primary transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95">
                                   <Video className="w-5 h-5" />
                                   Galeria
-                                  <input 
-                                    type="file" accept="video/*" className="hidden" 
+                                  <input
+                                    type="file" accept="video/*" className="hidden"
                                     onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) setVideoFiles(prev => ({ ...prev, [room.id]: [file] }));
+                                      setRoomVideo(room.id, e.target.files?.[0] || null);
+                                      e.target.value = '';
                                     }}
                                   />
                                 </label>
                                 <label className="flex items-center justify-center gap-3 py-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-md active:scale-95">
                                   <Video className="w-5 h-5" />
                                   Câmera
-                                  <input 
-                                    type="file" accept="video/*" capture="environment" className="hidden" 
+                                  <input
+                                    type="file" accept="video/*" capture="environment" className="hidden"
                                     onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) setVideoFiles(prev => ({ ...prev, [room.id]: [file] }));
+                                      setRoomVideo(room.id, e.target.files?.[0] || null);
+                                      e.target.value = '';
                                     }}
                                   />
                                 </label>
@@ -881,19 +915,16 @@ export default function NewInspectionPage() {
 
                             {/* Room Previews */}
                             <div className="flex flex-wrap gap-2.5">
-                              {photoFiles[room.id]?.map((file, idx) => (
-                                <div key={idx} className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in" onClick={() => setPreviewImage(URL.createObjectURL(file))}>
-                                  <img 
-                                    src={URL.createObjectURL(file)} 
-                                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-                                    onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
+                              {photoFiles[room.id]?.map((entry, idx) => (
+                                <div key={entry.url} className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in" onClick={() => setPreviewImage(entry.url)}>
+                                  <img
+                                    src={entry.url}
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
                                   />
-                                  <button 
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const newFiles = [...photoFiles[room.id]];
-                                      newFiles.splice(idx, 1);
-                                      setPhotoFiles(prev => ({ ...prev, [room.id]: newFiles }));
+                                      removeRoomPhoto(room.id, idx);
                                     }}
                                     className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
@@ -901,15 +932,11 @@ export default function NewInspectionPage() {
                                   </button>
                                 </div>
                               ))}
-                              {videoFiles[room.id]?.map((file, idx) => (
-                                <div key={idx} className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center relative group">
+                              {videoFiles[room.id]?.map((entry, idx) => (
+                                <div key={entry.url} className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center relative group">
                                   <Video className="w-6 h-6 text-slate-400" />
-                                  <button 
-                                    onClick={() => setVideoFiles(prev => {
-                                      const next = {...prev};
-                                      delete next[room.id];
-                                      return next;
-                                    })}
+                                  <button
+                                    onClick={() => setRoomVideo(room.id, null)}
                                     className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white"
                                   >
                                     <X className="w-3 h-3" />

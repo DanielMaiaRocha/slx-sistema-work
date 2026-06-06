@@ -22,6 +22,7 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
   const router = useRouter();
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { branding } = useBranding();
   const [loading, setLoading] = useState(true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(false);
@@ -55,7 +56,6 @@ export default function LandlordLayout({ children }: { children: React.ReactNode
   ];
 
   const userName = Cookies.get('user_name') || 'Proprietário';
-  const { branding } = useBranding();
   const tenantLogo = branding?.logoUrl;
 
   return (

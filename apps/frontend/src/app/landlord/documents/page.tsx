@@ -41,13 +41,13 @@ export default function LandlordDocuments() {
     <div className="space-y-12 pb-24 max-w-6xl mx-auto">
       {/* Header section */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-8 pt-4">
-        <div className="flex items-center gap-6">
-          <div className="w-20 h-20 bg-white border border-slate-100 rounded-[2.5rem] flex items-center justify-center p-4 shadow-xl shadow-slate-200/50">
-             <Files className="w-10 h-10 text-primary" />
+        <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+          <div className="w-14 h-14 sm:w-20 sm:h-20 shrink-0 bg-white border border-slate-100 rounded-[1.75rem] sm:rounded-[2.5rem] flex items-center justify-center p-3 sm:p-4 shadow-xl shadow-slate-200/50">
+             <Files className="w-7 h-7 sm:w-10 sm:h-10 text-primary" />
           </div>
-          <div className="space-y-1.5">
-             <h2 className="text-4xl font-extrabold text-slate-900 tracking-tighter uppercase leading-none">Documentos <span className="text-primary italic">&</span> Relatórios</h2>
-             <p className="text-slate-400 font-bold tracking-widest text-[10px] uppercase opacity-80">Extratos, vistorias e informativos SLX</p>
+          <div className="space-y-1.5 min-w-0">
+             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tighter uppercase leading-none">Documentos <span className="text-primary italic">&</span> Relatórios</h2>
+             <p className="text-slate-400 font-bold tracking-widest text-[9px] sm:text-[10px] uppercase opacity-80">Extratos, vistorias e informativos SLX</p>
           </div>
         </div>
       </section>
@@ -71,12 +71,12 @@ export default function LandlordDocuments() {
       {/* Documents List */}
       <section className="space-y-6">
         {documents.length === 0 ? (
-          <div className="py-32 rounded-[4rem] bg-slate-50/50 border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 bg-white border border-slate-100 rounded-[2rem] flex items-center justify-center text-slate-200 shadow-sm">
-              <FileText className="w-10 h-10" />
+          <div className="py-20 sm:py-32 px-6 rounded-[2.5rem] sm:rounded-[4rem] bg-slate-50/50 border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white border border-slate-100 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center text-slate-200 shadow-sm">
+              <FileText className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
             <div className="space-y-2">
-              <p className="text-slate-900 font-extrabold text-2xl tracking-tighter uppercase">Nenhum documento disponível</p>
+              <p className="text-slate-900 font-extrabold text-xl sm:text-2xl tracking-tighter uppercase">Nenhum documento disponível</p>
               <p className="text-slate-400 font-bold text-sm tracking-tight max-w-sm">
                 Quando a imobiliária enviar relatórios ou extratos, eles aparecerão automaticamente aqui.
               </p>
@@ -85,19 +85,19 @@ export default function LandlordDocuments() {
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {documents.map((doc) => (
-              <div 
+              <div
                 key={doc.id}
-                className="group flex items-center justify-between p-7 bg-white border border-slate-200 rounded-[2.5rem] hover:border-primary hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 shadow-sm"
+                className="group flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 sm:gap-6 p-5 sm:p-7 bg-white border border-slate-200 rounded-[2rem] sm:rounded-[2.5rem] hover:border-primary hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 shadow-sm"
               >
-                <div className="flex items-center gap-7">
-                   <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-300">
-                      <FileText className="w-8 h-8" />
+                <div className="flex items-center gap-4 sm:gap-7 min-w-0">
+                   <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-300">
+                      <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
                    </div>
-                   <div className="space-y-2">
-                      <h4 className="text-lg font-extrabold text-slate-900 tracking-tighter leading-tight group-hover:text-primary transition-colors">
+                   <div className="space-y-2 min-w-0">
+                      <h4 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tighter leading-tight group-hover:text-primary transition-colors break-words">
                         {doc.name}
                       </h4>
-                      <div className="flex items-center gap-5">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-5">
                          <span className="flex items-center gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                            <Clock className="w-3.5 h-3.5" />
                            {new Date(doc.createdAt).toLocaleDateString('pt-BR')}
@@ -112,7 +112,7 @@ export default function LandlordDocuments() {
                   href={getAssetUrl(doc.url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-8 py-5 yellow-button text-black rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-3 px-6 sm:px-8 py-4 sm:py-5 yellow-button text-black rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   <Download className="w-4.5 h-4.5" />
                   Visualizar

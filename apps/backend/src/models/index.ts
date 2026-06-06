@@ -97,6 +97,12 @@ const documentSchema = new Schema({
   amount: Number,
   address: String,
   duration: String,
+  // Parsed from the contract PDF (locatário/locador and term boundaries).
+  tenantName: String,
+  tenantCpf: String,
+  landlordName: String,
+  startDate: String,
+  endDate: String,
   tenantId: { type: String, required: true, index: true },
   userId: { type: String, required: true, index: true },
   visibility: { type: String, default: 'ALL' },
@@ -221,6 +227,19 @@ const mediaSchema = new Schema({
   createdAt: { type: Date, default: Date.now },
 }, stringIdOpts);
 
+// ─── AsaasMonthCache ─────────────────────────────────────────────────────────
+// Caches the Asaas account statement (financialTransactions) for a *closed*
+// calendar month. A past month never changes, so once fetched it's stored
+// forever and the reconciliation reads it back instead of re-paginating
+// thousands of entries from the Asaas API. The current month is never cached.
+const asaasMonthCacheSchema = new Schema({
+  _id: idField,
+  month: { type: String, required: true, unique: true }, // 'YYYY-MM'
+  transactions: { type: Schema.Types.Mixed, default: [] },
+  count: { type: Number, default: 0 },
+  cachedAt: { type: Date, default: Date.now },
+}, stringIdOpts);
+
 // ─── Exports ─────────────────────────────────────────────────────────────────
 function getOrDefine<T>(name: string, schema: Schema, collection: string): Model<any> {
   return (mongoose.models[name] as Model<any>) || model(name, schema, collection);
@@ -238,6 +257,7 @@ export const InspectionVideo = getOrDefine('InspectionVideo', inspectionVideoSch
 export const Property = getOrDefine('Property', propertySchema, 'Property');
 export const Log = getOrDefine('Log', logSchema, 'Log');
 export const Media = getOrDefine('Media', mediaSchema, 'Media');
+export const AsaasMonthCache = getOrDefine('AsaasMonthCache', asaasMonthCacheSchema, 'AsaasMonthCache');
 
 export type UserDoc = mongoose.InferSchemaType<typeof userSchema> & { _id: string };
 export type TenantDoc = mongoose.InferSchemaType<typeof tenantSchema> & { _id: string };

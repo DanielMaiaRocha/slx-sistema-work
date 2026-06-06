@@ -38,20 +38,36 @@ const DURATION_PATTERNS = [
   /\bprazo\s+(?:de\s+)?(\d+)\s*\(?\s*[a-záêç\s]*?\s*\)?\s*meses\b/i,
 ];
 
+// A written date is "10 de janeiro de 2025". \w doesn't cover accented month
+// names (março), so match lowercase letters + the accented Latin range.
+const WD = String.raw`\d{1,2}\s+de\s+[a-zà-ÿ]+\s+de\s+\d{4}`;
+const ND = String.raw`\d{2}\/\d{2}\/\d{4}`;
+
 const DATE_RANGE_PATTERNS = [
-  // Original written form: "iniciar-se no dia 01 de maio de 2026 e findar-se no dia 01 de maio de 2029"
+  // Written form: "a iniciar-se no dia 10 de janeiro de 2025 e findar-se no dia
+  // 10 de julho de 2027". [-\s]* tolerates PDF line-break hyphenation
+  // ("findar-\nse" → after de-hyphenation "findarse").
   {
-    pattern: /iniciar.se\s+no\s+dia\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\s+e\s+findar.se\s+no\s+dia\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/is,
+    pattern: new RegExp(String.raw`iniciar[-\s]*se\s+no\s+dia\s+(${WD})\s+e\s+findar[-\s]*se\s+no\s+dia\s+(${WD})`, 'i'),
+    format: 'written' as const,
+  },
+  // Written: "início em/no dia <data> ... término/fim/findar/encerramento em <data>"
+  {
+    pattern: new RegExp(String.raw`in[ií]cio\s+(?:em|no\s+dia)\s+(${WD})[\s\S]{0,30}?(?:t[eé]rmino|fim|findar|encerr\w*)\s+(?:em|no\s+dia)\s+(${WD})`, 'i'),
     format: 'written' as const,
   },
   // Numeric: "com início em 01/05/2026 e término em 01/05/2029"
   {
-    pattern: /(?:com\s+)?in[ií]cio\s+em\s+(\d{2}\/\d{2}\/\d{4})\s+e\s+t[eé]rmino\s+em\s+(\d{2}\/\d{2}\/\d{4})/i,
+    pattern: new RegExp(String.raw`(?:com\s+)?in[ií]cio\s+em\s+(${ND})\s+e\s+t[eé]rmino\s+em\s+(${ND})`, 'i'),
     format: 'numeric' as const,
   },
-  // "do dia X ao dia Y" written
+  // "do dia X ao dia Y" — numeric and written
   {
-    pattern: /do\s+dia\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\s+(?:até|ao\s+dia)\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i,
+    pattern: new RegExp(String.raw`do\s+dia\s+(${ND})\s+(?:até|ao\s+dia)\s+(${ND})`, 'i'),
+    format: 'numeric' as const,
+  },
+  {
+    pattern: new RegExp(String.raw`do\s+dia\s+(${WD})\s+(?:até|ao\s+dia)\s+(${WD})`, 'i'),
     format: 'written' as const,
   },
 ];
@@ -83,6 +99,10 @@ const TENANT_PATTERNS = [
 function normalizeText(raw: string): string {
   return raw
     .replace(/\r\n?/g, '\n')
+    // De-hyphenate words split across a line break ("findar-\nse" → "findarse").
+    // Justified PDFs hyphenate at line ends; this rejoins them so clause regexes
+    // match. Joining loses the hyphen of a few legit compounds — acceptable.
+    .replace(/([A-Za-zÀ-ÿ])-\n([A-Za-zÀ-ÿ])/g, '$1$2')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -95,6 +115,16 @@ function writtenDateToNumeric(s: string): string {
   const year = parts[parts.length - 1];
   const month = MONTH_MAP[monthName] || '??';
   return `${day}/${month}/${year}`;
+}
+
+// "10/01/2025" + 30 → "10/07/2027"
+function addMonths(dmy: string, months: number): string {
+  const [d, m, y] = dmy.split('/').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setMonth(date.getMonth() + months);
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${date.getFullYear()}`;
 }
 
 function firstMatch(text: string, patterns: RegExp[]): RegExpMatchArray | null {
@@ -147,7 +177,20 @@ export class ParserService {
       if (landlordMatch) metadata.landlordName = landlordMatch[1].trim().replace(/\s+/g, ' ');
 
       const tenantMatch = firstMatch(text, TENANT_PATTERNS);
-      if (tenantMatch) metadata.tenantName = tenantMatch[1].trim().replace(/\s+/g, ' ');
+      if (tenantMatch) {
+        metadata.tenantName = tenantMatch[1].trim().replace(/\s+/g, ' ');
+
+        // The locatário's CPF lives in their identification block, right after
+        // the name (e.g. "...CPF nº 095.384.167-75, domiciliado..."). Anchor on
+        // "CPF" within a window starting at the LOCATÁRIO match so we don't pick
+        // up the locador's CPF (which appears earlier in the document).
+        const block = text.slice(tenantMatch.index ?? 0, (tenantMatch.index ?? 0) + 400);
+        const cpfMatch = block.match(/CPF[^\d]{0,15}(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i);
+        if (cpfMatch) {
+          const digits = cpfMatch[1].replace(/\D/g, '');
+          metadata.tenantCpf = digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        }
+      }
 
       // ─── Rent ──────────────────────────────────────────────────────────────
       const rentMatch = firstMatch(text, RENT_PATTERNS);
@@ -167,53 +210,46 @@ export class ParserService {
 
       // ─── Duration + Date Range ────────────────────────────────────────────
       const durationMatch = firstMatch(text, DURATION_PATTERNS);
-      if (durationMatch) {
-        const months = durationMatch[1];
+      const months = durationMatch ? durationMatch[1] : null;
 
-        // Try each date-range variant
-        let startDateStr: string | null = null;
-        let endDateStr: string | null = null;
-        for (const { pattern, format } of DATE_RANGE_PATTERNS) {
-          const m = text.match(pattern);
-          if (m) {
-            if (format === 'written') {
-              startDateStr = writtenDateToNumeric(m[1]);
-              endDateStr = writtenDateToNumeric(m[2]);
-            } else {
-              startDateStr = m[1];
-              endDateStr = m[2];
-            }
-            break;
-          }
-        }
-
-        if (startDateStr && endDateStr) {
-          // Repair: if start === end but duration > 0, recompute end from start + months
-          if (startDateStr === endDateStr && Number(months) > 0 && !startDateStr.includes('??')) {
-            const [d, m, y] = startDateStr.split('/').map(Number);
-            const date = new Date(y, m - 1, d);
-            date.setMonth(date.getMonth() + Number(months));
-            const dd = String(date.getDate()).padStart(2, '0');
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const yyyy = date.getFullYear();
-            endDateStr = `${dd}/${mm}/${yyyy}`;
-            console.log(`🤖 [AUTO PARSER] Repaired end date from ${months} months: ${endDateStr}`);
-          }
-          metadata.duration = `${months} meses (${startDateStr} - ${endDateStr})`;
-        } else {
-          metadata.duration = `${months} meses`;
+      // Try each date-range variant for an explicit start/end pair.
+      let startDateStr: string | null = null;
+      let endDateStr: string | null = null;
+      for (const { pattern, format } of DATE_RANGE_PATTERNS) {
+        const m = text.match(pattern);
+        if (m) {
+          startDateStr = format === 'written' ? writtenDateToNumeric(m[1]) : m[1];
+          endDateStr = format === 'written' ? writtenDateToNumeric(m[2]) : m[2];
+          break;
         }
       }
 
-      // ─── Fallback start date ───────────────────────────────────────────────
-      // Look for "início em DD/MM/YYYY" or "data de início" first, then the
-      // first DD/MM/YYYY as last resort (was matching signature dates before).
-      const startCtx = text.match(/(?:in[ií]cio|vig[eê]ncia|data\s+inicial)[^0-9]{0,40}(\d{2}\/\d{2}\/\d{4})/i);
-      if (startCtx) {
-        metadata.startDate = startCtx[1];
-      } else {
-        const anyDate = text.match(/(\d{2}\/\d{2}\/\d{4})/);
-        if (anyDate) metadata.startDate = anyDate[1];
+      // No explicit range? Try a contextual start date ("início em <data>",
+      // "a iniciar-se no dia <data>") — written or numeric.
+      if (!startDateStr) {
+        const startCtx = text.match(
+          new RegExp(String.raw`(?:in[ií]cio|vig[eê]ncia|data\s+inicial|iniciar[-\s]*se\s+no\s+dia)[^0-9]{0,40}(${WD}|${ND})`, 'i')
+        );
+        if (startCtx) {
+          startDateStr = startCtx[1].includes('/') ? startCtx[1] : writtenDateToNumeric(startCtx[1]);
+        }
+      }
+
+      // Compute the end from start + months when the contract only states one.
+      if (startDateStr && months && Number(months) > 0 && !startDateStr.includes('??')) {
+        if (!endDateStr || endDateStr === startDateStr) {
+          endDateStr = addMonths(startDateStr, Number(months));
+        }
+      }
+
+      if (startDateStr && !startDateStr.includes('??')) metadata.startDate = startDateStr;
+      if (endDateStr && !endDateStr.includes('??')) metadata.endDate = endDateStr;
+
+      if (months) {
+        metadata.duration =
+          metadata.startDate && metadata.endDate
+            ? `${months} meses (${metadata.startDate} - ${metadata.endDate})`
+            : `${months} meses`;
       }
 
       console.log('🤖 [AUTO PARSER] Extracted Metadata:', metadata);

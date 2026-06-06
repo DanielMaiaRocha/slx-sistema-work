@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Property, DocumentModel, User } from '../models';
+import { Property, DocumentModel } from '../models';
 
 // Brazilian address variants are messy: "Rua X, 100, Centro" vs "Rua X nº 100
 // Centro - SP" vs "R. X, 100 - Centro". Strip prefixes/punctuation and collapse
@@ -50,18 +50,9 @@ export class LandlordController {
         deletedAt: null,
       }).lean();
 
-      // Bulk-load tenant (locatário) users so we can include their name on
-      // each contract.
-      const tenantUserIds = [...new Set(contracts.map((c) => c.userId).filter(Boolean))];
-      const tenantUsers: any[] = await User.find({ _id: { $in: tenantUserIds } })
-        .select({ _id: 1, name: 1, cpf: 1 })
-        .lean();
-      const tenantUserById = new Map(tenantUsers.map((u) => [u._id, u]));
-
       const enriched = properties.map((p) => {
         const match = contracts.find((c) => addressMatches(c.address, p.address));
         if (!match) return p;
-        const t = tenantUserById.get(match.userId);
         return {
           ...p,
           contract: {
@@ -71,8 +62,13 @@ export class LandlordController {
             amount: match.amount ?? null,
             address: match.address ?? null,
             duration: match.duration ?? null,
-            tenantName: t?.name ?? null,
-            tenantCpf: t?.cpf ?? null,
+            // The locatário (inquilino) is taken from the parsed contract PDF —
+            // the Document's userId is whoever the contract was filed under
+            // (usually the proprietário), so it must NOT be used as the tenant.
+            tenantName: match.tenantName ?? null,
+            tenantCpf: match.tenantCpf ?? null,
+            startDate: match.startDate ?? null,
+            endDate: match.endDate ?? null,
             createdAt: match.createdAt,
           },
         };

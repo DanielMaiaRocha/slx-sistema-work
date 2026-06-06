@@ -25,24 +25,24 @@ export default function LandlordSupport() {
     <div className="space-y-12 max-w-2xl mx-auto pb-24">
       {/* Header Section */}
       <div className="flex flex-col items-center text-center space-y-4 pt-4">
-        <div className="w-20 h-20 bg-white border border-slate-100 rounded-[2rem] flex items-center justify-center p-4 shadow-xl shadow-slate-200/50">
-           <HelpCircle className="w-10 h-10 text-primary" />
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white border border-slate-100 rounded-[1.75rem] sm:rounded-[2rem] flex items-center justify-center p-3 sm:p-4 shadow-xl shadow-slate-200/50">
+           <HelpCircle className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tighter uppercase leading-none">Central do Proprietário</h1>
-          <p className="text-slate-400 font-bold tracking-widest text-[10px] uppercase opacity-80">Gestão patrimonial e atendimento SLX</p>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tighter uppercase leading-none">Central do Proprietário</h1>
+          <p className="text-slate-400 font-bold tracking-widest text-[9px] sm:text-[10px] uppercase opacity-80">Gestão patrimonial e atendimento SLX</p>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-200/40">
-        <div className="p-10 space-y-10">
-           <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-primary shadow-sm">
-                <MessageCircle className="w-8 h-8" />
+      <div className="bg-white border border-slate-200 rounded-[2rem] sm:rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-200/40">
+        <div className="p-6 sm:p-10 space-y-8 sm:space-y-10">
+           <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-primary shadow-sm">
+                <MessageCircle className="w-7 h-7 sm:w-8 sm:h-8" />
               </div>
-              <div className="space-y-1">
-                <h2 className="text-xl font-extrabold text-slate-900 uppercase tracking-tighter">Atendimento Prioritário</h2>
-                <p className="text-slate-400 text-sm font-bold opacity-70">Fale com seu gestor de conta via WhatsApp.</p>
+              <div className="space-y-1 min-w-0">
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 uppercase tracking-tighter">Atendimento Prioritário</h2>
+                <p className="text-slate-400 text-xs sm:text-sm font-bold opacity-70">Fale com seu gestor de conta via WhatsApp.</p>
               </div>
            </div>
 
@@ -65,21 +65,21 @@ export default function LandlordSupport() {
            </button>
         </div>
 
-        <div className="bg-slate-50 p-10 grid grid-cols-2 gap-10 border-t border-slate-100">
-           <div className="flex items-center gap-5">
-              <div className="w-12 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 shadow-sm">
-                <Clock className="w-6 h-6" />
+        <div className="bg-slate-50 p-6 sm:p-10 grid grid-cols-2 gap-4 sm:gap-10 border-t border-slate-100">
+           <div className="flex items-center gap-3 sm:gap-5">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 shadow-sm">
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Expediente</p>
                 <p className="text-sm font-extrabold text-slate-900 tracking-tight">09h às 18h</p>
               </div>
            </div>
-           <div className="flex items-center gap-5">
-              <div className="w-12 h-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-emerald-500 shadow-sm">
-                <ShieldCheck className="w-6 h-6" />
+           <div className="flex items-center gap-3 sm:gap-5">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-emerald-500 shadow-sm">
+                <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</p>
                 <p className="text-sm font-extrabold text-slate-900 tracking-tight">Prioritário</p>
               </div>
@@ -87,7 +87,7 @@ export default function LandlordSupport() {
         </div>
       </div>
 
-      <div className="p-10 bg-amber-50 border border-amber-100 rounded-[2.5rem] space-y-4 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+      <div className="p-6 sm:p-10 bg-amber-50 border border-amber-100 rounded-[2rem] sm:rounded-[2.5rem] space-y-4 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
          <div className="w-14 h-14 bg-white border border-amber-200 rounded-2xl flex items-center justify-center text-amber-500 shadow-xl shadow-amber-200/30 shrink-0">
             <HelpCircle className="w-7 h-7" />
          </div>

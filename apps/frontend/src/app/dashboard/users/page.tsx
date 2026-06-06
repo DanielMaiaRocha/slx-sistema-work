@@ -7,6 +7,7 @@ import { fetchApi } from '@/lib/api';
 import { getAssetUrl } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import ConfirmModal from '@/components/ConfirmModal';
+import UserDetailModal from '@/components/UserDetailModal';
 import Cookies from 'js-cookie';
 import { toast } from 'react-hot-toast';
 
@@ -311,6 +312,14 @@ export default function UsersPage() {
   const [propertyUser, setPropertyUser] = useState<any>(null);
   const [userProperties, setUserProperties] = useState<any[]>([]);
 
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailUser, setDetailUser] = useState<{ id: string; name: string } | null>(null);
+
+  const openUserDetail = (user: any) => {
+    setDetailUser({ id: user.id, name: user.name });
+    setIsDetailOpen(true);
+  };
+
   const handleEditProperties = async (user: any) => {
     setPropertyUser(user);
     setIsPropertyModalOpen(true);
@@ -454,7 +463,12 @@ export default function UsersPage() {
                 {(user.name || 'U')[0].toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-slate-900 leading-tight truncate">{user.name}</h3>
+                <button
+                  onClick={() => openUserDetail(user)}
+                  className="text-sm font-bold text-slate-900 leading-tight truncate text-left hover:text-primary transition-colors cursor-pointer"
+                >
+                  {user.name}
+                </button>
                 <p className="text-[10px] text-slate-400 truncate">{user.email && user.email !== 'N/A' ? user.email : 'Sem e-mail'}</p>
               </div>
               <button 
@@ -594,7 +608,13 @@ export default function UsersPage() {
                       </div>
                       <div>
                         <div className="text-slate-900 font-black text-sm leading-tight flex items-center gap-2">
-                          {user.name}
+                          <button
+                            onClick={() => openUserDetail(user)}
+                            className="hover:text-primary transition-colors cursor-pointer text-left"
+                            title="Ver cadastro e boletos"
+                          >
+                            {user.name}
+                          </button>
                           {user.isLocalOverride && <span className="text-[8px] bg-primary/10 text-primary px-2 py-0.5 rounded-lg font-black uppercase tracking-widest border border-primary/20">Dashboard</span>}
                         </div>
                         <div className="text-slate-500 text-[11px] font-medium flex items-center gap-1.5 mt-1">
@@ -1302,6 +1322,13 @@ export default function UsersPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <UserDetailModal
+        userId={detailUser?.id || null}
+        userName={detailUser?.name}
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+      />
     </div>
   );
 }

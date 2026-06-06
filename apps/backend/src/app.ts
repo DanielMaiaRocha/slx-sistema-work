@@ -26,6 +26,8 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-slug'],
+  // Expose so cross-origin clients can read the download filename.
+  exposedHeaders: ['Content-Disposition'],
 };
 
 app.use(cors(corsOptions));

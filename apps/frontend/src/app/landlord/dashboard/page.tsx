@@ -17,6 +17,8 @@ interface Contract {
   duration: string | null;
   tenantName: string | null;
   tenantCpf: string | null;
+  startDate: string | null;
+  endDate: string | null;
   createdAt: string;
 }
 
@@ -82,7 +84,7 @@ export default function LandlordDashboard() {
         <div className="absolute top-0 left-0 w-1.5 md:w-2 h-full bg-primary" />
         <div className="relative z-10 space-y-4 md:space-y-6">
           <div className="inline-flex items-center gap-2 md:gap-3 px-4 md:px-5 py-2 bg-slate-50 border border-slate-100 rounded-full text-primary text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em]">
-            <TrendingUp className="w-3.5 md:w-4 h-3.5 md:w-4 h-4" />
+            <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4" />
             Visão Geral do Patrimônio
           </div>
           <div className="space-y-2 md:space-y-3">
@@ -316,7 +318,12 @@ function ContractModal({
   contract: Contract;
   onClose: () => void;
 }) {
-  const { months, start, end } = parseDuration(contract.duration);
+  const parsed = parseDuration(contract.duration);
+  // Prefer the explicit parsed fields; fall back to digging them out of the
+  // duration string for contracts parsed before those fields existed.
+  const start = contract.startDate ?? parsed.start;
+  const end = contract.endDate ?? parsed.end;
+  const months = parsed.months;
 
   const adjustment = 'Anual (12 meses)'; // Brazilian standard; parser doesn't extract this yet
 

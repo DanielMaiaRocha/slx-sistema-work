@@ -91,7 +91,12 @@ router.post('/settings/upload-logo', tenantMiddleware, authMiddleware([Role.ADMI
 // ─── Dashboard / Users / Financial ───────────────────────────────────────────
 router.get('/dashboard/stats', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT]), DashboardController.getStats);
 router.get('/financial/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'financial_view'), FinancialController.listAll);
+router.get('/financial/reconciliation', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER], 'financial_view'), FinancialController.getReconciliation);
+router.get('/financial/reconciliation/pdf', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER], 'financial_view'), FinancialController.exportReconciliationPdf);
+router.get('/financial/reconciliation/excel', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER], 'financial_view'), FinancialController.exportReconciliationExcel);
+router.get('/financial/user/:userId', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'financial_view'), FinancialController.listByUser);
 router.get('/users/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_view'), UserController.listAll);
+router.get('/users/:userId/details', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_view'), UserController.getDetails);
 router.get('/users/team', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.listTeam);
 router.post('/users', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.create);
 router.get('/users/profile/me', tenantMiddleware, authMiddleware(), UserController.getProfile);

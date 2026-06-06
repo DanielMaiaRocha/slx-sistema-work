@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { asaasApi } from '../services/asaas.service';
+import { asaasApi, AsaasService } from '../services/asaas.service';
 import { User, Property } from '../models';
 import bcrypt from 'bcryptjs';
 
@@ -73,72 +73,130 @@ export class UserController {
     const { offset = 0, limit = 20, search, role } = req.query;
 
     try {
-      const asaasParams: any = { offset, limit };
-      if (role) asaasParams.groupName = role;
-
+      // Translate the search term into the right Asaas customer filter.
       let s = '';
+      const searchParams: any = {};
       if (search) {
         s = search.toString();
-        if (s.includes('@')) asaasParams.email = s;
-        else if (/^\d+$/.test(s.replace(/[-. /]/g, ''))) asaasParams.cpfCnpj = s.replace(/[-. /]/g, '');
-        else asaasParams.name = s;
+        if (s.includes('@')) searchParams.email = s;
+        else if (/^\d+$/.test(s.replace(/[-. /]/g, ''))) searchParams.cpfCnpj = s.replace(/[-. /]/g, '');
+        else searchParams.name = s;
       }
 
-      const asaasResponse = await asaasApi.get('/customers', { params: asaasParams });
-      const customers = asaasResponse.data.data || [];
-      const totalCount = asaasResponse.data.totalCount;
+      // Normalize a (possibly CSV, possibly Portuguese) role string into a
+      // deduped list of canonical English roles.
+      const normalizeRole = (raw: string): string[] =>
+        Array.from(
+          new Set(
+            (raw || '')
+              .split(',')
+              .map((r) => {
+                const t = r.trim();
+                if (t === 'Proprietário') return 'LANDLORD';
+                if (t === 'Inquilino') return 'TENANT';
+                return t;
+              })
+              .filter(Boolean)
+          )
+        );
 
-      const localFilter: any = { tenantId: req.tenantId, deletedAt: null };
-      if (role) localFilter.role = { $regex: role.toString() };
-      const localUsers: any[] = await User.find(localFilter).lean();
+      // All local users for this tenant: provides role overrides for Asaas
+      // customers AND the manually-created (local-only) users.
+      const localUsers: any[] = await User.find({ tenantId: req.tenantId, deletedAt: null }).lean();
+      const overrideByAsaas = new Map<string, any>();
+      localUsers.forEach((u) => {
+        if (u.asaasId) overrideByAsaas.set(u.asaasId.toUpperCase(), u);
+      });
 
-      const formatted = customers.map((c: any) => {
-        const local = localUsers.find((u) => u.asaasId?.toUpperCase() === c.id?.toUpperCase());
-
-        let roleRaw = local?.role || c.groupName || 'TENANT';
-        const normalizedRoles = roleRaw.split(',').map((r: string) => {
-          const trimmed = r.trim();
-          if (trimmed === 'Proprietário') return 'LANDLORD';
-          if (trimmed === 'Inquilino') return 'TENANT';
-          return trimmed;
-        });
-        const finalRole = Array.from(new Set(normalizedRoles)).join(',');
-
+      // The effective role is the local override (CSV, may hold multiple roles
+      // like "LANDLORD,TENANT") when present, else the Asaas group. This is the
+      // single source of truth we filter cargo on — never the Asaas groupName,
+      // which is a single Portuguese group and ignores local multi-role edits.
+      const mapCustomer = (c: any) => {
+        const local = overrideByAsaas.get(c.id?.toUpperCase());
         return {
           id: c.id,
           name: local?.name || c.name,
           email: c.email || 'N/A',
           phone: local?.phone || c.mobilePhone || c.phone || 'N/A',
           cpfCnpj: c.cpfCnpj || 'N/A',
-          role: finalRole,
+          role: normalizeRole(local?.role || c.groupName || 'TENANT').join(','),
           status: 'Ativo',
           isLocalOverride: !!local,
         };
+      };
+
+      const mapLocalOnly = (u: any) => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone || 'N/A',
+        cpfCnpj: u.cpf || 'N/A',
+        role: normalizeRole(u.role).join(','),
+        status: 'Ativo',
+        isLocalOverride: true,
       });
 
-      if (offset === 0) {
+      const matchesSearch = (u: any) =>
+        !search ||
+        u.name.toLowerCase().includes(s.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(s.toLowerCase());
+
+      if (role) {
+        // ── Cargo filter ──
+        // Filtering happens on the *resolved* role, so we can't lean on Asaas
+        // pagination (it doesn't know local roles). Pull every customer (capped),
+        // resolve + filter + paginate in memory. A user with multiple roles now
+        // shows up under each of their cargos.
+        const wanted = role.toString();
+
+        const PAGE = 100;
+        const MAX = 3000;
+        const allCustomers: any[] = [];
+        for (let off = 0; off < MAX; off += PAGE) {
+          const r = await asaasApi.get('/customers', { params: { ...searchParams, offset: off, limit: PAGE } });
+          const batch = r.data.data || [];
+          allCustomers.push(...batch);
+          if (batch.length < PAGE) break;
+        }
+
+        const fromAsaas = allCustomers.map(mapCustomer).filter((u) => u.role.split(',').includes(wanted));
+
         const localOnly = localUsers
           .filter((u) => !u.asaasId)
-          .map((u) => ({
-            id: u._id,
-            name: u.name,
-            email: u.email,
-            phone: u.phone || 'N/A',
-            cpfCnpj: u.cpf || 'N/A',
-            role: u.role,
-            status: 'Ativo',
-            isLocalOverride: true,
-          }));
+          .map(mapLocalOnly)
+          .filter((u) => u.role.split(',').includes(wanted) && matchesSearch(u));
 
-        const filteredLocal = search
-          ? localOnly.filter(
-              (u) =>
-                u.name.toLowerCase().includes(s.toLowerCase()) ||
-                u.email.toLowerCase().includes(s.toLowerCase())
-            )
-          : localOnly;
+        // Local-only users first (manually created), then Asaas customers.
+        const merged = [...localOnly, ...fromAsaas];
+        const total = merged.length;
+        const off = Number(offset);
+        const pageData = merged.slice(off, off + Number(limit));
 
-        formatted.unshift(...filteredLocal);
+        return res.json({
+          data: pageData,
+          pagination: { total, offset: off, limit: Number(limit) },
+        });
+      }
+
+      // ── No cargo filter: keep the efficient Asaas-paginated path ──
+      const asaasResponse = await asaasApi.get('/customers', { params: { ...searchParams, offset, limit } });
+      const customers = asaasResponse.data.data || [];
+      const totalCount = asaasResponse.data.totalCount;
+
+      const formatted = customers.map(mapCustomer);
+
+      // Local-only users are prepended on the first page. `offset` arrives as a
+      // query string ('0'), so compare numerically — otherwise `'0' === 0` is
+      // false and these users (e.g. a proprietário cadastrado manualmente)
+      // silently vanish from the list.
+      if (Number(offset) === 0) {
+        const localOnly = localUsers
+          .filter((u) => !u.asaasId)
+          .map(mapLocalOnly)
+          .filter(matchesSearch);
+
+        formatted.unshift(...localOnly);
       }
 
       res.json({
@@ -361,6 +419,74 @@ export class UserController {
     } catch (error) {
       console.error('UserController.delete error:', error);
       res.status(500).json({ error: 'Falha ao remover colaborador.' });
+    }
+  }
+
+  // Detailed registration for the "click a user → modal" view. Merges the
+  // local User record with the Asaas customer (which carries address fields the
+  // local record doesn't store). Accepts an internal cuid OR an Asaas `cus_` id.
+  static async getDetails(req: Request, res: Response) {
+    const userId = req.params.userId as string;
+    const tenantId = req.tenantId;
+
+    try {
+      const upper = userId.toUpperCase();
+      let local: any = null;
+      let asaasId: string | null = null;
+
+      if (upper.startsWith('CUS_')) {
+        asaasId = userId;
+        local = await User.findOne({
+          $or: [{ asaasId: userId }, { asaasId: upper }],
+          tenantId,
+          deletedAt: null,
+        }).lean();
+      } else {
+        local = await User.findOne({ _id: userId, tenantId, deletedAt: null }).lean();
+        asaasId = local?.asaasId || null;
+      }
+
+      let asaasCustomer: any = null;
+      if (asaasId) {
+        try {
+          asaasCustomer = await AsaasService.getCustomerById(asaasId);
+        } catch {
+          /* customer may not exist in Asaas; fall back to local data */
+        }
+      }
+
+      if (!local && !asaasCustomer) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const details = {
+        id: userId,
+        asaasId,
+        name: local?.name || asaasCustomer?.name || 'N/A',
+        email: local?.email || asaasCustomer?.email || 'N/A',
+        phone: local?.phone || asaasCustomer?.mobilePhone || asaasCustomer?.phone || 'N/A',
+        cpfCnpj: local?.cpf || asaasCustomer?.cpfCnpj || 'N/A',
+        role: local?.role || 'TENANT',
+        creci: local?.creci || null,
+        createdAt: local?.createdAt || null,
+        isLocalOverride: !!local,
+        address: asaasCustomer
+          ? {
+              street: asaasCustomer.address || '',
+              number: asaasCustomer.addressNumber || '',
+              complement: asaasCustomer.complement || '',
+              neighborhood: asaasCustomer.province || '',
+              city: asaasCustomer.cityName || '',
+              state: asaasCustomer.state || '',
+              postalCode: asaasCustomer.postalCode || '',
+            }
+          : null,
+      };
+
+      res.json(details);
+    } catch (error: any) {
+      console.error('UserController.getDetails error:', error);
+      res.status(500).json({ error: 'Falha ao buscar detalhes do usuário.' });
     }
   }
 

@@ -98,6 +98,11 @@ export class DocumentController {
           amount,
           address: address || metadata.address || null,
           duration: metadata.duration || null,
+          tenantName: metadata.tenantName || null,
+          tenantCpf: metadata.tenantCpf || null,
+          landlordName: metadata.landlordName || null,
+          startDate: metadata.startDate || null,
+          endDate: metadata.endDate || null,
         });
       }
 
@@ -197,8 +202,15 @@ export class DocumentController {
             }
             await DocumentModel.findByIdAndUpdate(doc._id, {
               amount,
-              address: metadata.address || null,
+              // Keep the address set at upload (it links the contract to its
+              // property); the parser's address is unreliable. Only fill if empty.
+              address: doc.address || metadata.address || null,
               duration: metadata.duration || null,
+              tenantName: metadata.tenantName || null,
+              tenantCpf: metadata.tenantCpf || null,
+              landlordName: metadata.landlordName || null,
+              startDate: metadata.startDate || null,
+              endDate: metadata.endDate || null,
             });
             allResults.push({ userName: user.name, docName: doc.name, status: 'success', metadata });
           } catch (err) {

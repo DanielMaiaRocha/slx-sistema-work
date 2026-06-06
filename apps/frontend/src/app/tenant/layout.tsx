@@ -22,6 +22,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { branding } = useBranding();
   const [loading, setLoading] = useState(true);
   const [hasNotifications, setHasNotifications] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -65,7 +66,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   ];
 
   const userName = Cookies.get('user_name') || 'Inquilino';
-  const { branding } = useBranding();
   const tenantLogo = branding?.logoUrl;
 
   return (

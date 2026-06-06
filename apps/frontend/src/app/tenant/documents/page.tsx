@@ -45,13 +45,13 @@ export default function DocumentsPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pt-4">
         <div className="space-y-4">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 bg-white border border-slate-100 rounded-[2rem] flex items-center justify-center p-4 shadow-xl shadow-slate-200/50">
-               <FolderOpen className="w-8 h-8 text-primary" />
+          <div className="flex items-center gap-4 sm:gap-5">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 bg-white border border-slate-100 rounded-[1.75rem] sm:rounded-[2rem] flex items-center justify-center p-3 sm:p-4 shadow-xl shadow-slate-200/50">
+               <FolderOpen className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
             </div>
-            <div>
-               <h1 className="text-4xl font-extrabold text-slate-900 tracking-tighter uppercase leading-none">Meus Arquivos</h1>
-               <p className="text-slate-400 font-bold tracking-widest text-[10px] uppercase mt-2 opacity-80">Gestão centralizada de documentos SLX</p>
+            <div className="min-w-0">
+               <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tighter uppercase leading-none">Meus Arquivos</h1>
+               <p className="text-slate-400 font-bold tracking-widest text-[9px] sm:text-[10px] uppercase mt-2 opacity-80">Gestão centralizada de documentos SLX</p>
             </div>
           </div>
         </div>
@@ -92,12 +92,12 @@ export default function DocumentsPage() {
             <div key={i} className="h-32 bg-slate-50 border border-slate-100 rounded-[2.5rem] animate-pulse" />
           ))
         ) : filteredDocs.length === 0 ? (
-          <div className="col-span-full py-32 text-center space-y-6 bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-[3rem]">
-            <div className="inline-flex p-8 bg-white border border-slate-100 rounded-3xl shadow-sm mb-4">
-              <FileText className="w-16 h-16 text-slate-200" />
+          <div className="col-span-full py-20 sm:py-32 px-6 text-center space-y-6 bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-[2.5rem] sm:rounded-[3rem]">
+            <div className="inline-flex p-6 sm:p-8 bg-white border border-slate-100 rounded-3xl shadow-sm mb-4">
+              <FileText className="w-12 h-12 sm:w-16 sm:h-16 text-slate-200" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-2xl font-extrabold text-slate-900 tracking-tighter">Nenhum documento encontrado</h3>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tighter">Nenhum documento encontrado</h3>
               <p className="text-slate-400 font-bold text-sm tracking-tight max-w-sm mx-auto">Você ainda não possui arquivos ou contratos anexados em sua conta.</p>
             </div>
           </div>
@@ -108,14 +108,14 @@ export default function DocumentsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="group bg-white border border-slate-200 rounded-[2.5rem] p-8 hover:border-primary hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 flex items-center justify-between shadow-sm"
+              className="group bg-white border border-slate-200 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 hover:border-primary hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 flex items-center justify-between gap-4 shadow-sm"
             >
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-primary/5 group-hover:border-primary/20 transition-all duration-300">
-                  <FileText className="w-8 h-8" />
+              <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-primary/5 group-hover:border-primary/20 transition-all duration-300">
+                  <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
-                <div className="space-y-2">
-                  <h4 className="text-lg font-extrabold text-slate-900 group-hover:text-primary transition-colors tracking-tighter leading-tight">{doc.name}</h4>
+                <div className="space-y-2 min-w-0">
+                  <h4 className="text-base sm:text-lg font-extrabold text-slate-900 group-hover:text-primary transition-colors tracking-tighter leading-tight break-words">{doc.name}</h4>
                   <div className="flex items-center gap-3">
                     <span className="px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-widest">
                       {new Date(doc.createdAt).toLocaleDateString('pt-BR')}
@@ -123,15 +123,15 @@ export default function DocumentsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 shrink-0">
                 <a
                   href={getAssetUrl(doc.url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-14 h-14 bg-white border border-slate-100 text-slate-400 hover:text-black hover:border-primary hover:bg-primary rounded-2xl transition-all shadow-sm flex items-center justify-center hover:scale-110 active:scale-95"
+                  className="w-12 h-12 sm:w-14 sm:h-14 bg-white border border-slate-100 text-slate-400 hover:text-black hover:border-primary hover:bg-primary rounded-2xl transition-all shadow-sm flex items-center justify-center hover:scale-110 active:scale-95"
                   title="Abrir Documento"
                 >
-                  <ExternalLink className="w-6 h-6" />
+                  <ExternalLink className="w-5 h-5 sm:w-6 sm:h-6" />
                 </a>
               </div>
             </motion.div>

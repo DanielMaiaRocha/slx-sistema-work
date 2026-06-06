@@ -124,9 +124,9 @@ export default function TenantDashboard() {
 
           <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-2 gap-8">
             {bills.length === 0 ? (
-              <div className="md:col-span-full bg-slate-50 border border-slate-100 rounded-[3rem] p-24 text-center space-y-6">
-                <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center text-slate-200 mx-auto shadow-sm">
-                  <CreditCard className="w-12 h-12" />
+              <div className="md:col-span-full bg-slate-50 border border-slate-100 rounded-[2.5rem] sm:rounded-[3rem] p-10 sm:p-24 text-center space-y-6">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-3xl flex items-center justify-center text-slate-200 mx-auto shadow-sm">
+                  <CreditCard className="w-10 h-10 sm:w-12 sm:h-12" />
                 </div>
                 <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-xs italic">Nenhum boleto encontrado em sua conta.</p>
               </div>

@@ -60,13 +60,13 @@ export default function TenantContract() {
       </div>
 
       {contracts.length === 0 ? (
-        <div className="bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-[3.5rem] p-24 text-center space-y-8">
-          <div className="inline-flex p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm mb-2 relative group transition-transform hover:scale-110">
+        <div className="bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-[2.5rem] sm:rounded-[3.5rem] p-8 sm:p-24 text-center space-y-8">
+          <div className="inline-flex p-6 sm:p-10 bg-white border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm mb-2 relative group transition-transform hover:scale-110">
             <div className="absolute inset-0 bg-primary/5 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
-            <FileSearch className="w-16 h-16 text-slate-200 relative z-10" />
+            <FileSearch className="w-12 h-12 sm:w-16 sm:h-16 text-slate-200 relative z-10" />
           </div>
           <div className="space-y-3">
-            <h3 className="text-2xl font-extrabold text-slate-900 tracking-tighter">Nenhum contrato digital encontrado</h3>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tighter">Nenhum contrato digital encontrado</h3>
             <p className="text-slate-400 font-bold text-sm tracking-tight max-w-xs mx-auto">Sua imobiliária ainda não disponibilizou o contrato digital nesta área.</p>
           </div>
           <div className="pt-4">
@@ -78,52 +78,52 @@ export default function TenantContract() {
       ) : (
         <div className="space-y-10">
           {contracts.map((contract) => (
-            <div key={contract.id} className="bg-white border border-slate-200 rounded-[3.5rem] p-10 space-y-10 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
-              <div className="flex items-center gap-6">
-                 <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center text-primary shadow-sm">
-                    <FileText className="w-8 h-8" />
+            <div key={contract.id} className="bg-white border border-slate-200 rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 space-y-8 sm:space-y-10 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
+              <div className="flex items-center gap-4 sm:gap-6">
+                 <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center text-primary shadow-sm">
+                    <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
                  </div>
-                 <div>
-                    <h3 className="text-2xl font-extrabold text-slate-900 tracking-tighter leading-tight">{contract.name}</h3>
+                 <div className="min-w-0">
+                    <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tighter leading-tight break-words">{contract.name}</h3>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1.5 opacity-70">Documento de Locação Oficial</p>
                  </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
-                <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-400">
-                     <Home className="w-6 h-6" />
+              <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                <div className="p-5 sm:p-8 bg-slate-50 border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6 shadow-inner">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-400">
+                     <Home className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Endereço do Imóvel</p>
-                    <p className="text-lg font-extrabold text-slate-900 tracking-tight">{contract.address || 'Endereço não informado'}</p>
+                    <p className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight break-words">{contract.address || 'Endereço não informado'}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-emerald-500">
-                       <DollarSign className="w-6 h-6" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="p-5 sm:p-8 bg-slate-50 border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6 shadow-inner">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 bg-white rounded-2xl flex items-center justify-center shadow-sm text-emerald-500">
+                       <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Aluguel Base</p>
-                      <p className="text-lg font-extrabold text-slate-900 tracking-tight">
+                      <p className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
                         {contract.amount ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.amount) : 'Sob consulta'}
                       </p>
                     </div>
                   </div>
-                  <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-amber-500">
-                       <Calendar className="w-6 h-6" />
+                  <div className="p-5 sm:p-8 bg-slate-50 border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] flex items-center gap-4 sm:gap-6 shadow-inner">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 bg-white rounded-2xl flex items-center justify-center shadow-sm text-amber-500">
+                       <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Prazo Vigente</p>
-                      <p className="text-lg font-extrabold text-slate-900 tracking-tight">{contract.duration || 'Não informada'}</p>
+                      <p className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight break-words">{contract.duration || 'Não informada'}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-6">
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                  <a
                   href={getAssetUrl(contract.url)}
                   target="_blank"

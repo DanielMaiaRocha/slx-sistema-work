@@ -1,18 +1,18 @@
 # apps/frontend/Dockerfile
 FROM node:22-slim AS base
 
-# 1. Instalar dependências apenas quando necessário
-FROM base AS deps
+# Estágio de build. Instalamos as dependências AQUI mesmo (antes de copiar o
+# código, para aproveitar o cache de camada) em vez de copiar a node_modules de
+# um estágio separado — assim não dependemos de o npm "hoistar" tudo para a raiz.
+# (O npm às vezes aninha o `next` em apps/frontend/node_modules; copiar só a
+# node_modules da raiz deixava o `next` de fora → "next: not found".)
+FROM base AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
 RUN npm install --ignore-scripts
 
-# 2. Reconstruir o código-fonte apenas quando necessário
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Variáveis de ambiente de build (necessárias para o Next.js)

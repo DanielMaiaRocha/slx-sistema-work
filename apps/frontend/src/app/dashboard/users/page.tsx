@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi } from '@/lib/api';
 import { getAssetUrl } from '@/lib/utils';
+import { formatCPF, formatPhone as maskPhone, onlyDigits } from '@/lib/format';
 import { useAuth } from '@/hooks/useAuth';
 import ConfirmModal from '@/components/ConfirmModal';
 import UserDetailModal from '@/components/UserDetailModal';
@@ -803,8 +804,8 @@ export default function UsersPage() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CPF</label>
                     <input
-                      type="text" value={newUserForm.cpf}
-                      onChange={(e) => setNewUserForm({...newUserForm, cpf: e.target.value.replace(/\D/g, '').slice(0, 11)})}
+                      type="text" value={formatCPF(newUserForm.cpf)} inputMode="numeric"
+                      onChange={(e) => setNewUserForm({...newUserForm, cpf: onlyDigits(e.target.value).slice(0, 11)})}
                       placeholder="000.000.000-00"
                       className={`w-full bg-slate-50 border rounded-xl py-3 px-4 text-slate-900 text-sm outline-none transition-all ${
                         cpfCheck.status === 'exists' ? 'border-rose-400 focus:border-rose-500'
@@ -823,8 +824,8 @@ export default function UsersPage() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone <span className="text-slate-300 normal-case">(opcional)</span></label>
                     <input
-                      type="text" value={newUserForm.phone}
-                      onChange={(e) => setNewUserForm({...newUserForm, phone: e.target.value.replace(/\D/g, '').slice(0, 11)})}
+                      type="text" value={maskPhone(newUserForm.phone)} inputMode="numeric"
+                      onChange={(e) => setNewUserForm({...newUserForm, phone: onlyDigits(e.target.value).slice(0, 11)})}
                       placeholder="(00) 00000-0000"
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all"
                     />

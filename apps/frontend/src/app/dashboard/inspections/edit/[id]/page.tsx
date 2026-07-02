@@ -27,8 +27,10 @@ import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { cn, getAssetUrl } from '@/lib/utils';
+import { uploadFileImmediate } from '@/lib/uploadImage';
 import ConfirmModal from '@/components/ConfirmModal';
 import ImagePreviewModal from '@/components/ImagePreviewModal';
+import MediaThumb from '@/components/MediaThumb';
 
 interface Room {
   id: string;
@@ -48,7 +50,31 @@ interface Room {
   isExpanded?: boolean;
 }
 
-type FileEntry = { file: File; url: string };
+type FileEntry = {
+  id: string;
+  file: File | null;   // kept only while pending/failed, for retry
+  url: string;         // blob: preview while local; remote URL once uploaded
+  remoteUrl?: string;  // set once the file is safely stored on the server
+  status: 'uploading' | 'done' | 'error';
+};
+
+// Persist only finished uploads (URL strings) — never the raw File/blob.
+function serializeMedia(map: Record<string, FileEntry[]>) {
+  const out: Record<string, { id: string; remoteUrl: string }[]> = {};
+  for (const [k, list] of Object.entries(map)) {
+    const done = list.filter(e => e.remoteUrl).map(e => ({ id: e.id, remoteUrl: e.remoteUrl as string }));
+    if (done.length) out[k] = done;
+  }
+  return out;
+}
+
+function deserializeMedia(obj: Record<string, { id: string; remoteUrl: string }[]>): Record<string, FileEntry[]> {
+  const out: Record<string, FileEntry[]> = {};
+  for (const [k, list] of Object.entries(obj || {})) {
+    out[k] = list.map(e => ({ id: e.id, file: null, url: e.remoteUrl, remoteUrl: e.remoteUrl, status: 'done' as const }));
+  }
+  return out;
+}
 
 export default function EditInspectionPage() {
   const { id } = useParams();
@@ -64,9 +90,56 @@ export default function EditInspectionPage() {
   useEffect(() => { photoFilesRef.current = photoFiles; }, [photoFiles]);
   useEffect(() => { videoFilesRef.current = videoFiles; }, [videoFiles]);
   useEffect(() => () => {
-    Object.values(photoFilesRef.current).flat().forEach(e => URL.revokeObjectURL(e.url));
-    Object.values(videoFilesRef.current).flat().forEach(e => URL.revokeObjectURL(e.url));
+    const revoke = (e: FileEntry) => { if (e.url?.startsWith('blob:')) URL.revokeObjectURL(e.url); };
+    Object.values(photoFilesRef.current).flat().forEach(revoke);
+    Object.values(videoFilesRef.current).flat().forEach(revoke);
   }, []);
+
+  // ─── Upload-as-you-go helpers ──────────────────────────────────────────────
+  // Each photo/video uploads to the server the moment it's picked, so it's safe
+  // even if the tab is evicted mid-inspection. State holds only a URL string.
+  const makeEntry = (file: File): FileEntry => ({
+    id: Math.random().toString(36).slice(2),
+    file,
+    url: URL.createObjectURL(file),
+    status: 'uploading',
+  });
+
+  const runUpload = (
+    setState: React.Dispatch<React.SetStateAction<Record<string, FileEntry[]>>>,
+    key: string,
+    entry: FileEntry
+  ) => {
+    uploadFileImmediate(entry.file as File)
+      .then(remoteUrl => {
+        setState(prev => ({
+          ...prev,
+          [key]: (prev[key] || []).map(e => {
+            if (e.id !== entry.id) return e;
+            if (e.url.startsWith('blob:')) URL.revokeObjectURL(e.url);
+            return { ...e, url: remoteUrl, remoteUrl, status: 'done', file: null };
+          }),
+        }));
+      })
+      .catch(() => {
+        setState(prev => ({
+          ...prev,
+          [key]: (prev[key] || []).map(e => e.id === entry.id ? { ...e, status: 'error' } : e),
+        }));
+        toast.error('Falha ao enviar uma mídia. Toque nela para tentar de novo.', { id: 'upload-fail' });
+      });
+  };
+
+  const retryPhoto = (key: string, id: string) => {
+    const entry = (photoFilesRef.current[key] || []).find(e => e.id === id);
+    if (!entry?.file) return;
+    setPhotoFiles(prev => ({ ...prev, [key]: (prev[key] || []).map(e => e.id === id ? { ...e, status: 'uploading' } : e) }));
+    runUpload(setPhotoFiles, key, entry);
+  };
+
+  const pendingMediaCount = () =>
+    [...Object.values(photoFiles).flat(), ...Object.values(videoFiles).flat()]
+      .filter(e => e.status !== 'done').length;
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -104,7 +177,7 @@ export default function EditInspectionPage() {
     async function load() {
       try {
         const data = await fetchApi(`/inspections/${id}`);
-        setFormData({
+        const serverFormData = {
           propertyAddress: data.propertyAddress || '',
           propertyNumber: data.propertyNumber || '',
           propertyType: data.propertyType || 'RESIDENTIAL',
@@ -113,7 +186,7 @@ export default function EditInspectionPage() {
           inspectorData: JSON.parse(data.inspectorData || '{}'),
           date: data.date ? new Date(data.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           cep: data.cep || '',
-        });
+        };
 
         const mappedRooms = data.rooms.map((r: any) => ({
           id: Math.random().toString(36).substr(2, 9),
@@ -132,9 +205,32 @@ export default function EditInspectionPage() {
           photos: r.photos.map((p: any) => p.url),
           videos: r.videos.map((v: any) => v.url)
         }));
-        
+
         if (mappedRooms.length > 0) mappedRooms[0].isExpanded = true;
-        setRooms(mappedRooms);
+
+        // Recover an interrupted edit (photos already uploaded to the server,
+        // structure edits) from localStorage — keyed by inspection id. The media
+        // keys reference the room/item ids stored *in the same draft*, so rooms
+        // and media must be restored together.
+        const draftRaw = typeof window !== 'undefined' ? localStorage.getItem(`inspection_draft_${id}`) : null;
+        let restored = false;
+        if (draftRaw) {
+          try {
+            const d = JSON.parse(draftRaw);
+            setFormData(d.formData || serverFormData);
+            setRooms(d.rooms && d.rooms.length ? d.rooms : mappedRooms);
+            if (d.photoMedia) setPhotoFiles(deserializeMedia(d.photoMedia));
+            if (d.videoMedia) setVideoFiles(deserializeMedia(d.videoMedia));
+            restored = true;
+            toast.success('Rascunho recuperado automaticamente!', { id: 'draft-loaded', icon: '📝' });
+          } catch {
+            restored = false;
+          }
+        }
+        if (!restored) {
+          setFormData(serverFormData);
+          setRooms(mappedRooms);
+        }
       } catch (error) {
         toast.error('Erro ao carregar vistoria');
       } finally {
@@ -143,6 +239,22 @@ export default function EditInspectionPage() {
     }
     load();
   }, [id]);
+
+  // Persist the in-progress edit so a tab eviction mid-inspection doesn't lose
+  // the association between uploaded photos and their room/item.
+  useEffect(() => {
+    if (isLoading) return;
+    try {
+      localStorage.setItem(`inspection_draft_${id}`, JSON.stringify({
+        formData,
+        rooms,
+        photoMedia: serializeMedia(photoFiles),
+        videoMedia: serializeMedia(videoFiles),
+      }));
+    } catch {
+      // localStorage full — media is already on the server, so this is best-effort
+    }
+  }, [formData, rooms, photoFiles, videoFiles, isLoading, id]);
 
   const formatCEP = (cep: string) => {
     return cep.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 9);
@@ -261,11 +373,12 @@ export default function EditInspectionPage() {
   const handlePhotoUpload = (roomId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const entries: FileEntry[] = Array.from(files).map(file => ({ file, url: URL.createObjectURL(file) }));
+    const entries: FileEntry[] = Array.from(files).map(makeEntry);
     setPhotoFiles(prev => ({
       ...prev,
       [roomId]: [...(prev[roomId] || []), ...entries]
     }));
+    entries.forEach(entry => runUpload(setPhotoFiles, roomId, entry));
     e.target.value = '';
   };
 
@@ -279,11 +392,13 @@ export default function EditInspectionPage() {
   };
 
   const addItemPhotos = (itemId: string, files: File[]) => {
-    const entries: FileEntry[] = files.map(file => ({ file, url: URL.createObjectURL(file) }));
+    const key = `item-${itemId}`;
+    const entries: FileEntry[] = files.map(makeEntry);
     setPhotoFiles(prev => ({
       ...prev,
-      [`item-${itemId}`]: [...(prev[`item-${itemId}`] || []), ...entries]
+      [key]: [...(prev[key] || []), ...entries]
     }));
+    entries.forEach(entry => runUpload(setPhotoFiles, key, entry));
   };
 
   const removeItemPhoto = (itemId: string, idx: number) => {
@@ -304,6 +419,11 @@ export default function EditInspectionPage() {
   };
 
   const handleSave = async () => {
+    const pending = pendingMediaCount();
+    if (pending > 0) {
+      toast.error(`Aguarde o envio das fotos/vídeos: ${pending} pendente(s) ou com falha. Toque nas mídias em vermelho para reenviar.`);
+      return;
+    }
     setIsSaving(true);
     try {
       // 1. Update base inspection
@@ -352,39 +472,46 @@ export default function EditInspectionPage() {
             });
           }
 
-          // Upload photos for this item
-          const itemFiles = photoFiles[`item-${item.id}`] || [];
-          for (const entry of itemFiles) {
-            const photoFormData = new FormData();
-            photoFormData.append('photo', entry.file);
-            photoFormData.append('itemId', itemDbId as string);
-            await fetchApi(`/inspections/rooms/${roomDbId}/photos`, { method: 'POST', body: photoFormData });
+          // Link already-uploaded photos for this item (by URL).
+          const itemPhotos = (photoFiles[`item-${item.id}`] || []).filter(e => e.remoteUrl);
+          for (const entry of itemPhotos) {
+            await fetchApi(`/inspections/rooms/${roomDbId}/photos`, {
+              method: 'POST',
+              body: JSON.stringify({ url: entry.remoteUrl, itemId: itemDbId }),
+            });
           }
 
-          // Upload videos for this item
-          const itemVideos = videoFiles[`item-${item.id}`] || [];
+          // Link already-uploaded videos for this item (by URL).
+          const itemVideos = (videoFiles[`item-${item.id}`] || []).filter(e => e.remoteUrl);
           for (const entry of itemVideos) {
-            const videoFormData = new FormData();
-            videoFormData.append('video', entry.file);
-            videoFormData.append('itemId', itemDbId as string);
-            await fetchApi(`/inspections/rooms/${roomDbId}/videos`, { method: 'POST', body: videoFormData });
+            await fetchApi(`/inspections/rooms/${roomDbId}/videos`, {
+              method: 'POST',
+              body: JSON.stringify({ url: entry.remoteUrl, itemId: itemDbId }),
+            });
           }
         }
 
-        // Upload new photos for this room
-        const filesToUpload = photoFiles[room.id] || [];
-        for (const entry of filesToUpload) {
-          const photoFormData = new FormData();
-          photoFormData.append('photo', entry.file);
-
+        // Link new photos for this room (by URL).
+        const roomPhotos = (photoFiles[room.id] || []).filter(e => e.remoteUrl);
+        for (const entry of roomPhotos) {
           await fetchApi(`/inspections/rooms/${roomDbId}/photos`, {
             method: 'POST',
-            body: photoFormData
+            body: JSON.stringify({ url: entry.remoteUrl }),
+          });
+        }
+
+        // Link new videos for this room (by URL).
+        const roomVideos = (videoFiles[room.id] || []).filter(e => e.remoteUrl);
+        for (const entry of roomVideos) {
+          await fetchApi(`/inspections/rooms/${roomDbId}/videos`, {
+            method: 'POST',
+            body: JSON.stringify({ url: entry.remoteUrl }),
           });
         }
       }
 
       toast.success('Vistoria atualizada com sucesso!');
+      localStorage.removeItem(`inspection_draft_${id}`);
       router.push(`/dashboard/inspections/${id}`);
     } catch (error: any) {
       toast.error(`Erro ao salvar: ${error.message}`);
@@ -836,27 +963,15 @@ export default function EditInspectionPage() {
                                             </div>
                                           ))}
                                           {photoFiles[`item-${item.id}`]?.map((entry, idx) => (
-                                            <div
-                                              key={entry.url}
-                                              className="w-20 h-20 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
-                                              onClick={() => setPreviewImage(entry.url)}
-                                            >
-                                              <img
-                                                src={entry.url}
-                                                className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                              />
-                                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeItemPhoto(item.id, idx);
-                                                  }}
-                                                  className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center text-white hover:bg-rose-600 transition-colors shadow-lg"
-                                                >
-                                                  <X className="w-4 h-4" />
-                                                </button>
-                                              </div>
-                                            </div>
+                                            <MediaThumb
+                                              key={entry.id}
+                                              url={entry.url}
+                                              status={entry.status}
+                                              size="md"
+                                              onZoom={() => setPreviewImage(getAssetUrl(entry.url))}
+                                              onRemove={() => removeItemPhoto(item.id, idx)}
+                                              onRetry={() => retryPhoto(`item-${item.id}`, entry.id)}
+                                            />
                                           ))}
                                           {videoFiles[`item-${item.id}`]?.map((entry) => (
                                             <div key={entry.url} className="h-20 px-4 rounded-xl bg-primary/10 border border-primary/20 flex flex-col items-center justify-center gap-1 relative group min-w-[100px]">
@@ -938,23 +1053,15 @@ export default function EditInspectionPage() {
                                   </div>
                                 ))}
                                 {photoFiles[room.id]?.map((entry, idx) => (
-                                  <div
-                                    key={entry.url}
-                                    className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group shadow-sm cursor-zoom-in"
-                                    onClick={() => setPreviewImage(entry.url)}
-                                  >
-                                    <img
-                                      src={entry.url}
-                                      alt="Vistoria"
-                                      className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                                    />
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); removeRoomPhoto(room.id, idx); }}
-                                      className="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-lg flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
+                                  <MediaThumb
+                                    key={entry.id}
+                                    url={entry.url}
+                                    status={entry.status}
+                                    size="sm"
+                                    onZoom={() => setPreviewImage(getAssetUrl(entry.url))}
+                                    onRemove={() => removeRoomPhoto(room.id, idx)}
+                                    onRetry={() => retryPhoto(room.id, entry.id)}
+                                  />
                                 ))}
                               </div>
                             )}

@@ -9,24 +9,43 @@ export class UserController {
     const tenantId = req.tenantId;
 
     try {
-      if (!email || !name) {
-        return res.status(400).json({ error: 'Campos obrigatórios: nome e email.' });
+      // Only the name is required now — e-mail and phone are optional.
+      if (!name) {
+        return res.status(400).json({ error: 'O nome é obrigatório.' });
       }
 
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ error: 'E-mail já cadastrado.' });
+      const cleanCpf = cpf ? String(cpf).replace(/\D/g, '') : '';
+      const cleanPhone = phone ? String(phone).replace(/\D/g, '') : '';
+
+      // Block duplicate CPF (only when one was provided).
+      if (cleanCpf) {
+        const cpfOwner: any = await User.findOne({ cpf: cleanCpf, tenantId, deletedAt: null }).lean();
+        if (cpfOwner) {
+          return res.status(400).json({ error: `CPF já cadastrado para ${cpfOwner.name}.` });
+        }
+      }
+
+      // E-mail is optional. When given it must be unique; otherwise generate a
+      // unique placeholder so the schema's required+unique constraint holds.
+      let finalEmail = (email || '').trim().toLowerCase();
+      if (finalEmail) {
+        const existingUser = await User.findOne({ email: finalEmail });
+        if (existingUser) {
+          return res.status(400).json({ error: 'E-mail já cadastrado.' });
+        }
+      } else {
+        finalEmail = `sememail_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}@slx.local`;
       }
 
       const hashedPassword = await bcrypt.hash(password || 'FIRST_ACCESS_PENDING', 10);
 
       const user: any = await User.create({
         name,
-        email,
+        email: finalEmail,
         password: hashedPassword,
-        phone,
+        phone: cleanPhone || undefined,
         role: role || 'LANDLORD',
-        cpf,
+        cpf: cleanCpf || undefined,
         tenantId,
         isEmailVerified: true,
       });
@@ -50,6 +69,32 @@ export class UserController {
     } catch (error: any) {
       console.error('UserController.create error:', error);
       res.status(500).json({ error: 'Falha ao criar usuário.', details: error.message });
+    }
+  }
+
+  // Live "is this CPF already registered?" check for the registration form.
+  // Looks at local users first, then Asaas customers (best-effort).
+  static async checkCpf(req: Request, res: Response) {
+    const raw = (req.query.cpf || '').toString().replace(/\D/g, '');
+    if (raw.length !== 11 && raw.length !== 14) {
+      return res.json({ exists: false });
+    }
+    try {
+      const local: any = await User.findOne({ cpf: raw, tenantId: req.tenantId, deletedAt: null }).lean();
+      if (local) {
+        return res.json({ exists: true, source: 'local', name: local.name, role: local.role });
+      }
+      try {
+        const r = await asaasApi.get('/customers', { params: { cpfCnpj: raw } });
+        const c = (r.data?.data || [])[0];
+        if (c) return res.json({ exists: true, source: 'asaas', name: c.name });
+      } catch {
+        /* Asaas lookup is best-effort; ignore failures */
+      }
+      return res.json({ exists: false });
+    } catch (error) {
+      console.error('UserController.checkCpf error:', error);
+      return res.json({ exists: false });
     }
   }
 
@@ -312,6 +357,42 @@ export class UserController {
     }
   }
 
+  // Resolve a co-owner entry to a user id, creating the user (as LANDLORD) when
+  // they aren't registered yet. Matches an existing user by CPF, then by name.
+  private static async resolveOrCreateLandlord(
+    entry: { id?: string; name?: string; cpf?: string },
+    tenantId: string
+  ): Promise<string | null> {
+    if (entry.id) return entry.id;
+    const cleanCpf = entry.cpf ? String(entry.cpf).replace(/\D/g, '') : '';
+    const name = (entry.name || '').trim();
+    if (!name && !cleanCpf) return null;
+
+    if (cleanCpf) {
+      const byCpf: any = await User.findOne({ cpf: cleanCpf, tenantId, deletedAt: null }).lean();
+      if (byCpf) return byCpf._id;
+    }
+    if (name) {
+      const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const byName: any = await User.findOne({ name: { $regex: `^${esc}$`, $options: 'i' }, tenantId, deletedAt: null }).lean();
+      if (byName) return byName._id;
+    }
+
+    // Not found → auto-create the proprietário.
+    const finalEmail = `sememail_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}@slx.local`;
+    const hashed = await bcrypt.hash('FIRST_ACCESS_PENDING', 10);
+    const created: any = await User.create({
+      name: name || 'Proprietário',
+      email: finalEmail,
+      password: hashed,
+      role: 'LANDLORD',
+      cpf: cleanCpf || undefined,
+      tenantId,
+      isEmailVerified: true,
+    });
+    return created._id;
+  }
+
   static async getUserProperties(req: Request, res: Response) {
     const userId = req.params.userId as string;
     const tenantId = req.tenantId;
@@ -328,8 +409,35 @@ export class UserController {
         internalId = user._id;
       }
 
-      const properties = await Property.find({ landlordId: internalId, tenantId, deletedAt: null }).lean();
-      res.json(properties);
+      // Properties this user owns — as primary OR as a co-owner.
+      const properties: any[] = await Property.find({
+        $or: [{ landlordId: internalId }, { coLandlordIds: internalId }],
+        tenantId,
+        deletedAt: null,
+      }).lean();
+
+      // Attach the OTHER owners of each property (everyone but this user).
+      const otherIds = [
+        ...new Set(
+          properties.flatMap((p) => [p.landlordId, ...(p.coLandlordIds || [])]).filter((id) => id && id !== internalId)
+        ),
+      ];
+      const owners: any[] = otherIds.length
+        ? await User.find({ _id: { $in: otherIds } }).select({ _id: 1, name: 1, cpf: 1 }).lean()
+        : [];
+      const byId = new Map(owners.map((o) => [o._id, o]));
+
+      const enriched = properties.map((p) => ({
+        ...p,
+        coOwners: [p.landlordId, ...(p.coLandlordIds || [])]
+          .filter((id) => id && id !== internalId)
+          .map((id) => {
+            const o = byId.get(id);
+            return { id, name: o?.name || 'Proprietário', cpf: o?.cpf || '' };
+          }),
+      }));
+
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch user properties' });
     }
@@ -372,6 +480,8 @@ export class UserController {
       }
       const internalId = user._id;
 
+      // Only delete properties where THIS user is the primary owner — never
+      // remove a property just because a co-owner didn't re-send it.
       const currentProps: any[] = await Property.find({ landlordId: internalId, tenantId, deletedAt: null })
         .select({ _id: 1 })
         .lean();
@@ -385,20 +495,38 @@ export class UserController {
       }
 
       for (const prop of properties) {
+        // Resolve (and auto-create) each co-owner entered on the property.
+        const resolved: string[] = [];
+        for (const co of prop.coOwners || []) {
+          const id = await UserController.resolveOrCreateLandlord(co, tenantId);
+          if (id) resolved.push(id);
+        }
+
         if (prop.id) {
+          const existing: any = await Property.findById(prop.id).lean();
+          const primary = existing?.landlordId || internalId;
+          // Owner set = {co-owners entered} ∪ {this user}, minus the primary
+          // (which is stored separately in landlordId).
+          const ownerSet = new Set<string>(resolved);
+          ownerSet.add(internalId);
+          ownerSet.delete(primary);
           await Property.findByIdAndUpdate(prop.id, {
             address: prop.address,
             neighborhood: prop.neighborhood,
             city: prop.city,
             state: prop.state || 'RJ',
+            coLandlordIds: [...ownerSet],
           });
         } else if (prop.address) {
+          const ownerSet = new Set<string>(resolved);
+          ownerSet.delete(internalId);
           await Property.create({
             address: prop.address,
             neighborhood: prop.neighborhood,
             city: prop.city,
             state: prop.state || 'RJ',
             landlordId: internalId,
+            coLandlordIds: [...ownerSet],
             tenantId,
           });
         }

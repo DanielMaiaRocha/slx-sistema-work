@@ -198,7 +198,8 @@ const propertySchema = new Schema({
   state: String,
   zipCode: String,
   type: String,
-  landlordId: { type: String, required: true, index: true },
+  landlordId: { type: String, required: true, index: true }, // primary owner
+  coLandlordIds: { type: [String], default: [], index: true }, // additional owners
   tenantId: { type: String, required: true, index: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

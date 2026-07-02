@@ -11,17 +11,13 @@ import { InspectionController } from '../controllers/inspection.controller';
 import { upload } from '../config/multer';
 import { tenantMiddleware } from '../middlewares/tenant.middleware';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { saveUploadedFile } from '../services/storage.service';
 
 const router = Router();
 
+// Persist an uploaded file (Cloudinary when configured, MongoDB otherwise).
 async function saveFileToMedia(file: Express.Multer.File): Promise<string> {
-  const media: any = await Media.create({
-    filename: file.originalname,
-    mimeType: file.mimetype,
-    data: file.buffer,
-    size: file.size,
-  });
-  return `/api/media/${media._id}`;
+  return saveUploadedFile(file);
 }
 
 // ─── Serve media from DB ─────────────────────────────────────────────────────
@@ -96,6 +92,7 @@ router.get('/financial/reconciliation/pdf', tenantMiddleware, authMiddleware([Ro
 router.get('/financial/reconciliation/excel', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER], 'financial_view'), FinancialController.exportReconciliationExcel);
 router.get('/financial/user/:userId', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'financial_view'), FinancialController.listByUser);
 router.get('/users/all', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_view'), UserController.listAll);
+router.get('/users/check-cpf', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.checkCpf);
 router.get('/users/:userId/details', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER, Role.TENANT], 'users_view'), UserController.getDetails);
 router.get('/users/team', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.listTeam);
 router.post('/users', tenantMiddleware, authMiddleware([Role.ADMIN, Role.OWNER]), UserController.create);
@@ -129,11 +126,17 @@ router.delete('/inspections/items/:itemId', tenantMiddleware, authMiddleware(), 
 // ─── Inspection Media (photos/videos) ────────────────────────────────────────
 router.post('/inspections/rooms/:roomId/photos', tenantMiddleware, authMiddleware(), upload.single('photo'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'Nenhuma foto enviada' });
-    const url = await saveFileToMedia(req.file);
-    
     const { itemId } = req.body;
-    
+
+    // Two ways to attach a photo:
+    //  1. multipart file (legacy / direct upload) → store then create row
+    //  2. JSON { url } for a file that was already uploaded (upload-as-you-go)
+    let url = req.body.url;
+    if (req.file) {
+      url = await saveFileToMedia(req.file);
+    }
+    if (!url) return res.status(400).json({ error: 'Nenhuma foto enviada' });
+
     const photo = await InspectionPhoto.create({
       url,
       roomId: !itemId ? (req.params.roomId as string) : null,

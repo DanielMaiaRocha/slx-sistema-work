@@ -36,7 +36,7 @@ export class LandlordController {
 
     try {
       const properties: any[] = await Property.find({
-        landlordId: userId,
+        $or: [{ landlordId: userId }, { coLandlordIds: userId }],
         tenantId,
         deletedAt: null,
       }).lean();

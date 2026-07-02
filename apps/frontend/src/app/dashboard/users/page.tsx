@@ -46,6 +46,7 @@ export default function UsersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState({ name: '', email: '', password: 'FIRST_ACCESS_PENDING', phone: '', cpf: '', role: 'LANDLORD', properties: [] });
+  const [cpfCheck, setCpfCheck] = useState<{ status: 'idle' | 'checking' | 'exists' | 'free'; name?: string; source?: string }>({ status: 'idle' });
   const [isSaving, setIsSaving] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
@@ -105,9 +106,34 @@ export default function UsersPage() {
     { label: 'Apenas Proprietário', value: 'LANDLORD' },
   ];
 
+  // Live CPF check: once 11 digits are typed, ask the backend whether this
+  // person is already registered (locally or in Asaas) and warn before saving.
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+    const cpf = newUserForm.cpf;
+    if (cpf.length !== 11) {
+      setCpfCheck({ status: 'idle' });
+      return;
+    }
+    setCpfCheck({ status: 'checking' });
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetchApi(`/users/check-cpf?cpf=${cpf}`);
+        if (r?.exists) setCpfCheck({ status: 'exists', name: r.name, source: r.source });
+        else setCpfCheck({ status: 'free' });
+      } catch {
+        setCpfCheck({ status: 'idle' });
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [newUserForm.cpf, isCreateModalOpen]);
+
   const handleCreateUser = async () => {
-    if (!newUserForm.name || !newUserForm.email) {
-      return toast.error('Nome e e-mail são obrigatórios');
+    if (!newUserForm.name) {
+      return toast.error('O nome é obrigatório');
+    }
+    if (cpfCheck.status === 'exists') {
+      return toast.error(`CPF já cadastrado${cpfCheck.name ? ` para ${cpfCheck.name}` : ''}.`);
     }
     setIsSaving(true);
     try {
@@ -118,6 +144,7 @@ export default function UsersPage() {
       toast.success('Usuário criado com sucesso!');
       setIsCreateModalOpen(false);
       setNewUserForm({ name: '', email: '', password: 'FIRST_ACCESS_PENDING', phone: '', cpf: '', role: 'LANDLORD', properties: [] });
+      setCpfCheck({ status: 'idle' });
       loadUsers();
     } catch (err: any) {
       toast.error(err.message || 'Erro ao criar usuário');
@@ -765,8 +792,8 @@ export default function UsersPage() {
                     />
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail</label>
-                    <input 
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail <span className="text-slate-300 normal-case">(opcional)</span></label>
+                    <input
                       type="email" value={newUserForm.email}
                       onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
                       placeholder="joao.silva@exemplo.com"
@@ -775,16 +802,27 @@ export default function UsersPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CPF</label>
-                    <input 
+                    <input
                       type="text" value={newUserForm.cpf}
                       onChange={(e) => setNewUserForm({...newUserForm, cpf: e.target.value.replace(/\D/g, '').slice(0, 11)})}
                       placeholder="000.000.000-00"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all"
+                      className={`w-full bg-slate-50 border rounded-xl py-3 px-4 text-slate-900 text-sm outline-none transition-all ${
+                        cpfCheck.status === 'exists' ? 'border-rose-400 focus:border-rose-500'
+                        : cpfCheck.status === 'free' ? 'border-emerald-300 focus:border-emerald-400'
+                        : 'border-slate-200 focus:border-primary/50'
+                      }`}
                     />
+                    {cpfCheck.status === 'checking' && <p className="text-[10px] text-slate-400 font-medium ml-1">Verificando CPF…</p>}
+                    {cpfCheck.status === 'exists' && (
+                      <p className="text-[10px] text-rose-500 font-bold ml-1">
+                        ⚠ Já cadastrado{cpfCheck.name ? `: ${cpfCheck.name}` : ''}{cpfCheck.source === 'asaas' ? ' (Asaas)' : ''}
+                      </p>
+                    )}
+                    {cpfCheck.status === 'free' && <p className="text-[10px] text-emerald-600 font-bold ml-1">✓ CPF disponível</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone</label>
-                    <input 
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone <span className="text-slate-300 normal-case">(opcional)</span></label>
+                    <input
                       type="text" value={newUserForm.phone}
                       onChange={(e) => setNewUserForm({...newUserForm, phone: e.target.value.replace(/\D/g, '').slice(0, 11)})}
                       placeholder="(00) 00000-0000"
@@ -871,8 +909,8 @@ export default function UsersPage() {
 
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                 <button onClick={() => setIsCreateModalOpen(false)} className="px-6 py-2 text-slate-400 hover:text-slate-900 transition-colors text-sm font-bold cursor-pointer">Cancelar</button>
-                <button 
-                  onClick={handleCreateUser} disabled={isSaving}
+                <button
+                  onClick={handleCreateUser} disabled={isSaving || cpfCheck.status === 'exists'}
                   className="yellow-button px-8 py-3 rounded-xl shadow-xl shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-xs"
                 >
                   {isSaving ? 'Criando...' : 'Criar Proprietário'}

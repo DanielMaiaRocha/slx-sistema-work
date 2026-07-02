@@ -1,25 +1,71 @@
-import puppeteer from 'puppeteer';
-import path from 'path';
-import os from 'os';
+import puppeteer, { Browser } from 'puppeteer';
 import { Media } from '../models';
+
+// ─── Warm browser singleton ──────────────────────────────────────────────────
+// Launching Chromium per request is the dominant cost (cold start can be 15–30s
+// on Windows because Defender scans the binary). Keep one instance warm and
+// relaunch only if it disconnects — same pattern the reconciliation service uses.
+let browserPromise: Promise<Browser> | null = null;
+
+async function getBrowser(): Promise<Browser> {
+  if (browserPromise) {
+    try {
+      const b = await browserPromise;
+      if (b.connected) return b;
+    } catch { /* fall through to relaunch */ }
+    browserPromise = null;
+  }
+  browserPromise = puppeteer.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+  });
+  const b = await browserPromise;
+  b.on('disconnected', () => { browserPromise = null; });
+  return b;
+}
+
+// Ask Cloudinary for a small, PDF-sized derivative instead of the full photo.
+// Cuts each image from ~1–5 MB to ~30–60 KB and lets Chromium load them straight
+// from the CDN — no server-side download or base64 bloat.
+function cloudinaryThumb(url: string, size = 400): string {
+  const marker = '/upload/';
+  const i = url.indexOf(marker);
+  if (i === -1) return url;
+  const after = i + marker.length;
+  const rest = url.slice(after);
+  if (/^[a-z]+_[^/]+\//.test(rest)) return url; // already has a transformation
+  // Square thumbnail matching the 160px print cell (object-fit: cover), as a
+  // compact JPEG. Photos are displayed tiny in the PDF, so a full-res embed
+  // would only bloat the file (a 144-photo laudo went from ~70 MB to a few MB).
+  return url.slice(0, after) + `w_${size},h_${size},c_fill,q_auto:eco,f_jpg/` + rest;
+}
 
 export class PDFService {
   static async deleteInspectionPDF(inspectionId: string) {
     try {
-      const pdfFilename = `vistoria_${inspectionId}.pdf`;
-      const existing: any = await Media.findOne({ filename: pdfFilename }).lean();
+      const existing: any = await Media.findOne({ filename: `vistoria_${inspectionId}.pdf` }).lean();
       if (existing) {
         await Media.deleteOne({ _id: existing._id });
-        console.log(`Deleted cached PDF for inspection ${inspectionId}`);
       }
     } catch (err) {
       console.error('Error deleting cached PDF:', err);
     }
   }
 
-  private static async resolveToBase64(photoUrl: string): Promise<string> {
-    const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    if (!photoUrl) return placeholder;
+  private static readonly PLACEHOLDER =
+    'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+  // Resolve a stored photo URL to something an <img src> can render:
+  //  - Cloudinary URL → a resized derivative URL (loaded straight from the CDN)
+  //  - MongoDB /api/media/:id → base64 data URI (bytes live in the DB)
+  //  - anything else → returned as-is (or placeholder if empty)
+  private static async resolveImage(photoUrl: string): Promise<string> {
+    if (!photoUrl) return PDFService.PLACEHOLDER;
+
+    if (photoUrl.includes('res.cloudinary.com')) {
+      return cloudinaryThumb(photoUrl);
+    }
 
     const mediaMatch = photoUrl.match(/\/api\/media\/([a-zA-Z0-9_-]+)/);
     if (mediaMatch) {
@@ -27,33 +73,16 @@ export class PDFService {
         const media: any = await Media.findById(mediaMatch[1]).lean();
         if (media) {
           const buf = Buffer.isBuffer(media.data) ? media.data : (media.data?.buffer ?? Buffer.from(media.data ?? []));
-          const base64 = buf.toString('base64');
-          return `data:${media.mimeType};base64,${base64}`;
+          return `data:${media.mimeType};base64,${buf.toString('base64')}`;
         }
       } catch (err) {
         console.warn(`Failed to read media ${mediaMatch[1]} from DB:`, err);
       }
-      return placeholder;
+      return PDFService.PLACEHOLDER;
     }
 
-    // Legacy: try to fetch via HTTP (for old data that still has full URLs)
-    if (photoUrl.startsWith('http')) {
-      try {
-        const axios = (await import('axios')).default;
-        const response = await axios.get(photoUrl, {
-          responseType: 'arraybuffer',
-          timeout: 5000,
-        });
-        const buffer = Buffer.from(response.data, 'binary');
-        const contentType = response.headers['content-type'] || 'image/jpeg';
-        return `data:${contentType};base64,${buffer.toString('base64')}`;
-      } catch (error: any) {
-        console.warn(`Failed to fetch remote image: ${photoUrl}. Error: ${error.message}`);
-        return placeholder;
-      }
-    }
-
-    return placeholder;
+    if (photoUrl.startsWith('http')) return photoUrl;
+    return PDFService.PLACEHOLDER;
   }
 
   static async generateInspectionPDF(inspection: any, branding: any) {
@@ -61,7 +90,6 @@ export class PDFService {
 
     const existingPdf: any = await Media.findOne({ filename: pdfFilename }).lean();
     if (existingPdf) {
-      console.log(`PDF already exists for inspection ${inspection.id}, returning cached.`);
       return `/api/media/${existingPdf._id}`;
     }
 
@@ -93,25 +121,14 @@ export class PDFService {
 
     await Promise.all(
       uniqueUrls.map(async (url) => {
-        urlMap[url] = await PDFService.resolveToBase64(url);
+        urlMap[url] = await PDFService.resolveImage(url);
       })
     );
 
-    const uniqueUserDataDir = path.join(os.tmpdir(), `puppeteer_profile_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      userDataDir: uniqueUserDataDir,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
-      ]
-    });
+    const browser = await getBrowser();
+    const page = await browser.newPage();
 
     try {
-      const page = await browser.newPage();
       
       const landlord = JSON.parse(inspection.landlordData || '{}');
       const tenant = JSON.parse(inspection.tenantData || '{}');
@@ -272,40 +289,47 @@ export class PDFService {
         </html>
       `;
 
-      try {
-        await page.setContent(htmlContent, { 
-          waitUntil: 'load',
-          timeout: 4000
-        });
-      } catch (e: any) {
-        if (e.name === 'TimeoutError' || e.message?.includes('timeout')) {
-          console.warn('PDFService.generateInspectionPDF warning: Navigation/load timeout reached. Generating PDF with partially loaded assets.');
-        } else {
-          throw e;
-        }
-      }
-      
-      // Generate the PDF as a buffer (no disk writes)
+      // DOM first (data URIs are inline; Cloudinary images load over the network).
+      await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // Explicitly wait for every image to finish, but cap the wait so a single
+      // slow/broken image can't block the whole PDF — after the cap we render
+      // whatever loaded. This replaces the old 4s hard timeout that silently
+      // dropped photos on image-heavy laudos.
+      // NOTE: this runs inside the browser; DOM globals are reached via
+      // globalThis so the Node-side tsc (no 'dom' lib) still type-checks.
+      await page.evaluate(async () => {
+        const doc: any = (globalThis as any).document;
+        const imgs: any[] = Array.from(doc.images);
+        const settle = (img: any) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((res) => { img.onload = img.onerror = () => res(); });
+        const timeout = new Promise<void>((res) => setTimeout(res, 20000));
+        await Promise.race([Promise.all(imgs.map(settle)), timeout]);
+      });
+
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
-        margin: { top: '0', right: '0', bottom: '0', left: '0' }
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
       });
 
-      await browser.close();
-
+      // Small thumbnails keep the PDF well under MongoDB's 16 MB limit
+      // (a 144-photo laudo is ~3 MB), so it's stored in Media and served via
+      // /api/media/:id — no Cloudinary PDF-delivery restriction to worry about.
       const media: any = await Media.create({
         filename: pdfFilename,
         mimeType: 'application/pdf',
         data: Buffer.from(pdfBuffer),
         size: pdfBuffer.length,
       });
-
       return `/api/media/${media._id}`;
     } catch (error) {
       console.error('PDFService.generateInspectionPDF error:', error);
-      await browser.close();
       throw error;
+    } finally {
+      await page.close().catch(() => {});
     }
   }
 }

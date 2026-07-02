@@ -8,9 +8,16 @@ FROM node:22-slim AS base
 # node_modules da raiz deixava o `next` de fora → "next: not found".)
 FROM base AS builder
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
+# NÃO copiamos o package-lock.json de propósito. Ele é gerado no Windows e o npm
+# tem um bug conhecido (npm/cli#4828) em que, ao instalar no Linux a partir de um
+# lock feito em outra plataforma, ele PULA os binários nativos opcionais da
+# plataforma atual (lightningcss-linux-x64-gnu, @tailwindcss/oxide-linux-x64-gnu,
+# @next/swc-linux-*). Sem o lock, o npm resolve os binários corretos para Linux.
+# Mantemos --ignore-scripts para não baixar o Chromium do puppeteer (backend)
+# nesta imagem do frontend; os pacotes nativos são prebuilt e não precisam de script.
 RUN npm install --ignore-scripts
 
 COPY . .

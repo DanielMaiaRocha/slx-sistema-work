@@ -27,7 +27,7 @@ import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { cn, getAssetUrl } from '@/lib/utils';
+import { cn, getAssetUrl, normalizeParties } from '@/lib/utils';
 import { uploadFileImmediate } from '@/lib/uploadImage';
 import ConfirmModal from '@/components/ConfirmModal';
 import ImagePreviewModal from '@/components/ImagePreviewModal';
@@ -169,12 +169,28 @@ export default function NewInspectionPage() {
     propertyAddress: '',
     propertyNumber: '',
     propertyType: 'RESIDENTIAL',
-    landlordData: { name: '', cpf: '', rg: '', profession: '' },
-    tenantData: { name: '', cpf: '', rg: '', profession: '' },
+    landlordData: [{ name: '', cpf: '', rg: '', profession: '' }],
+    tenantData: [{ name: '', cpf: '', rg: '', profession: '' }],
     inspectorData: { name: '', creci: '', cpf: '' },
     date: new Date().toISOString().split('T')[0],
     cep: '',
   });
+
+  // ─── Locadores (multiple landlords) ─────────────────────────────────────────
+  const addLandlord = () =>
+    setFormData(prev => ({ ...prev, landlordData: [...prev.landlordData, { name: '', cpf: '', rg: '', profession: '' }] }));
+  const removeLandlord = (idx: number) =>
+    setFormData(prev => ({ ...prev, landlordData: prev.landlordData.filter((_, i) => i !== idx) }));
+  const updateLandlord = (idx: number, field: string, value: string) =>
+    setFormData(prev => ({ ...prev, landlordData: prev.landlordData.map((l, i) => i === idx ? { ...l, [field]: value } : l) }));
+
+  // ─── Locatários (multiple tenants) ──────────────────────────────────────────
+  const addTenant = () =>
+    setFormData(prev => ({ ...prev, tenantData: [...prev.tenantData, { name: '', cpf: '', rg: '', profession: '' }] }));
+  const removeTenant = (idx: number) =>
+    setFormData(prev => ({ ...prev, tenantData: prev.tenantData.filter((_, i) => i !== idx) }));
+  const updateTenant = (idx: number, field: string, value: string) =>
+    setFormData(prev => ({ ...prev, tenantData: prev.tenantData.map((t, i) => i === idx ? { ...t, [field]: value } : t) }));
 
   const formatCEP = (cep: string) => {
     return cep.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 9);
@@ -252,7 +268,7 @@ export default function NewInspectionPage() {
     if (draft && !isLoaded) {
       try {
         const { formData: savedFormData, rooms: savedRooms, step: savedStep, photoMedia, videoMedia } = JSON.parse(draft);
-        if (savedFormData) setFormData(savedFormData);
+        if (savedFormData) setFormData({ ...savedFormData, landlordData: normalizeParties(savedFormData.landlordData), tenantData: normalizeParties(savedFormData.tenantData) });
         if (savedRooms) setRooms(savedRooms);
         if (savedStep) setStep(savedStep);
         if (photoMedia) setPhotoFiles(deserializeMedia(photoMedia));
@@ -276,8 +292,8 @@ export default function NewInspectionPage() {
           propertyAddress: '',
           propertyNumber: '',
           propertyType: 'RESIDENTIAL',
-          landlordData: { name: '', cpf: '', rg: '', profession: '' },
-          tenantData: { name: '', cpf: '', rg: '', profession: '' },
+          landlordData: [{ name: '', cpf: '', rg: '', profession: '' }],
+          tenantData: [{ name: '', cpf: '', rg: '', profession: '' }],
           inspectorData: { name: '', creci: '', cpf: '' },
           date: new Date().toISOString().split('T')[0],
           cep: '',
@@ -706,72 +722,118 @@ export default function NewInspectionPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              {/* Locador */}
-              <div className="glass-card p-8 space-y-8 bg-white border-slate-200 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
-                    <Building className="w-5 h-5" />
+              {/* Locadores */}
+              <div className="space-y-6">
+                {formData.landlordData.map((landlord, lIndex) => (
+                  <div key={lIndex} className="glass-card p-8 space-y-8 bg-white border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                          <Building className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                          Dados do Locador{formData.landlordData.length > 1 ? ` ${lIndex + 1}` : ''}
+                        </h3>
+                      </div>
+                      {formData.landlordData.length > 1 && (
+                        <button
+                          onClick={() => removeLandlord(lIndex)}
+                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-5">
+                      <input
+                        placeholder="Nome Completo"
+                        value={landlord.name}
+                        onChange={e => updateLandlord(lIndex, 'name', e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm"
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          placeholder="CPF / CNPJ"
+                          maxLength={18}
+                          value={landlord.cpf}
+                          onChange={e => updateLandlord(lIndex, 'cpf', formatCPFCNPJ(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm"
+                        />
+                        <input
+                          placeholder="RG"
+                          maxLength={12}
+                          value={landlord.rg}
+                          onChange={e => updateLandlord(lIndex, 'rg', formatRG(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Dados do Locador</h3>
-                </div>
-                <div className="space-y-5">
-                  <input 
-                    placeholder="Nome Completo"
-                    value={formData.landlordData.name}
-                    onChange={e => setFormData({...formData, landlordData: {...formData.landlordData, name: e.target.value}})}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm" 
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <input 
-                      placeholder="CPF / CNPJ"
-                      maxLength={18}
-                      value={formData.landlordData.cpf}
-                      onChange={e => setFormData({...formData, landlordData: {...formData.landlordData, cpf: formatCPFCNPJ(e.target.value)}})}
-                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm" 
-                    />
-                    <input 
-                      placeholder="RG"
-                      maxLength={12}
-                      value={formData.landlordData.rg}
-                      onChange={e => setFormData({...formData, landlordData: {...formData.landlordData, rg: formatRG(e.target.value)}})}
-                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm" 
-                    />
-                  </div>
-                </div>
+                ))}
+                <button
+                  onClick={addLandlord}
+                  className="w-full py-4 border-2 border-dashed border-primary/20 rounded-2xl text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Locador
+                </button>
               </div>
 
-              {/* Locatário */}
-              <div className="glass-card p-8 space-y-8 bg-white border-slate-200 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
-                    <User className="w-5 h-5" />
+              {/* Locatários */}
+              <div className="space-y-6">
+                {formData.tenantData.map((tenant, tIndex) => (
+                  <div key={tIndex} className="glass-card p-8 space-y-8 bg-white border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                          Dados do Locatário{formData.tenantData.length > 1 ? ` ${tIndex + 1}` : ''}
+                        </h3>
+                      </div>
+                      {formData.tenantData.length > 1 && (
+                        <button
+                          onClick={() => removeTenant(tIndex)}
+                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-5">
+                      <input
+                        placeholder="Nome Completo"
+                        value={tenant.name}
+                        onChange={e => updateTenant(tIndex, 'name', e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm"
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          placeholder="CPF / CNPJ"
+                          maxLength={18}
+                          value={tenant.cpf}
+                          onChange={e => updateTenant(tIndex, 'cpf', formatCPFCNPJ(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm"
+                        />
+                        <input
+                          placeholder="RG"
+                          maxLength={12}
+                          value={tenant.rg}
+                          onChange={e => updateTenant(tIndex, 'rg', formatRG(e.target.value))}
+                          className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Dados do Locatário</h3>
-                </div>
-                <div className="space-y-5">
-                  <input 
-                    placeholder="Nome Completo"
-                    value={formData.tenantData.name}
-                    onChange={e => setFormData({...formData, tenantData: {...formData.tenantData, name: e.target.value}})}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm" 
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <input 
-                      placeholder="CPF / CNPJ"
-                      maxLength={18}
-                      value={formData.tenantData.cpf}
-                      onChange={e => setFormData({...formData, tenantData: {...formData.tenantData, cpf: formatCPFCNPJ(e.target.value)}})}
-                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm" 
-                    />
-                    <input 
-                      placeholder="RG"
-                      maxLength={12}
-                      value={formData.tenantData.rg}
-                      onChange={e => setFormData({...formData, tenantData: {...formData.tenantData, rg: formatRG(e.target.value)}})}
-                      className="w-full bg-white border border-slate-200 rounded-2xl py-4 px-6 text-sm text-slate-900 focus:border-primary/50 outline-none shadow-sm" 
-                    />
-                  </div>
-                </div>
+                ))}
+                <button
+                  onClick={addTenant}
+                  className="w-full py-4 border-2 border-dashed border-primary/20 rounded-2xl text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Locatário
+                </button>
               </div>
             </div>
 

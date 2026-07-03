@@ -27,7 +27,7 @@ import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn, getAssetUrl } from '@/lib/utils';
+import { cn, getAssetUrl, normalizeParties } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 
 export default function ViewInspectionPage() {
@@ -87,8 +87,8 @@ export default function ViewInspectionPage() {
 
   if (!inspection) return <div>Não encontrado</div>;
 
-  const landlord = JSON.parse(inspection.landlordData || '{}');
-  const tenant = JSON.parse(inspection.tenantData || '{}');
+  const landlords = normalizeParties(inspection.landlordData);
+  const tenants = normalizeParties(inspection.tenantData);
   const inspector = JSON.parse(inspection.inspectorData || '{}');
 
   return (
@@ -321,17 +321,29 @@ export default function ViewInspectionPage() {
               </h3>
               <div className="space-y-6">
                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Locatário</p>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                       <p className="text-sm font-bold text-slate-800">{tenant.name || 'Não informado'}</p>
-                       <p className="text-[10px] text-slate-400">CPF: {tenant.cpf || '---'}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      {tenants.length > 1 ? 'Locatários' : 'Locatário'}
+                    </p>
+                    <div className="space-y-2">
+                      {tenants.map((tenant, tIndex) => (
+                        <div key={tIndex} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                           <p className="text-sm font-bold text-slate-800">{tenant.name || 'Não informado'}</p>
+                           <p className="text-[10px] text-slate-400">CPF: {tenant.cpf || '---'}</p>
+                        </div>
+                      ))}
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Locador</p>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                       <p className="text-sm font-bold text-slate-800">{landlord.name || 'Não informado'}</p>
-                       <p className="text-[10px] text-slate-400">CPF: {landlord.cpf || '---'}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      {landlords.length > 1 ? 'Locadores' : 'Locador'}
+                    </p>
+                    <div className="space-y-2">
+                      {landlords.map((landlord, lIndex) => (
+                        <div key={lIndex} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                           <p className="text-sm font-bold text-slate-800">{landlord.name || 'Não informado'}</p>
+                           <p className="text-[10px] text-slate-400">CPF: {landlord.cpf || '---'}</p>
+                        </div>
+                      ))}
                     </div>
                  </div>
               </div>

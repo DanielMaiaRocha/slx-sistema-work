@@ -41,6 +41,21 @@ function cloudinaryThumb(url: string, size = 400): string {
   return url.slice(0, after) + `w_${size},h_${size},c_fill,q_auto:eco,f_jpg/` + rest;
 }
 
+// `landlordData` (locador) and `tenantData` (locatário) each used to hold a
+// single party object; both can now hold several. Normalize whatever is stored
+// (raw JSON string, single object, or array) into an array of party objects.
+// Returns [{}] when empty so the PDF still renders a row with the "---"
+// placeholders.
+function normalizeParties(raw: any): any[] {
+  let data = raw;
+  if (typeof raw === 'string') {
+    try { data = JSON.parse(raw || '{}'); } catch { data = {}; }
+  }
+  const arr = Array.isArray(data) ? data : (data && typeof data === 'object' ? [data] : []);
+  const list = arr.filter((t: any) => t && typeof t === 'object');
+  return list.length ? list : [{}];
+}
+
 export class PDFService {
   static async deleteInspectionPDF(inspectionId: string) {
     try {
@@ -130,8 +145,8 @@ export class PDFService {
 
     try {
       
-      const landlord = JSON.parse(inspection.landlordData || '{}');
-      const tenant = JSON.parse(inspection.tenantData || '{}');
+      const landlords = normalizeParties(inspection.landlordData);
+      const tenants = normalizeParties(inspection.tenantData);
       const inspector = JSON.parse(inspection.inspectorData || '{}');
 
       const getFullPhotoUrl = (photoUrl: string) => {
@@ -210,16 +225,20 @@ export class PDFService {
           <div class="section">
             <div class="section-title">Partes Envolvidas</div>
             <div class="grid">
-              <div class="info-item">
-                <div class="info-label">Locador</div>
-                <div class="info-value"><strong>${landlord.name || '---'}</strong></div>
-                <div class="info-value" style="font-size: 10px; color: #666;">CPF: ${landlord.cpf || '---'} | RG: ${landlord.rg || '---'}</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Locatário</div>
-                <div class="info-value"><strong>${tenant.name || '---'}</strong></div>
-                <div class="info-value" style="font-size: 10px; color: #666;">CPF: ${tenant.cpf || '---'} | RG: ${tenant.rg || '---'}</div>
-              </div>
+              ${landlords.map((landlord: any, i: number) => `
+                <div class="info-item">
+                  <div class="info-label">Locador${landlords.length > 1 ? ` ${i + 1}` : ''}</div>
+                  <div class="info-value"><strong>${landlord.name || '---'}</strong></div>
+                  <div class="info-value" style="font-size: 10px; color: #666;">CPF: ${landlord.cpf || '---'} | RG: ${landlord.rg || '---'}</div>
+                </div>
+              `).join('')}
+              ${tenants.map((tenant: any, i: number) => `
+                <div class="info-item">
+                  <div class="info-label">Locatário${tenants.length > 1 ? ` ${i + 1}` : ''}</div>
+                  <div class="info-value"><strong>${tenant.name || '---'}</strong></div>
+                  <div class="info-value" style="font-size: 10px; color: #666;">CPF: ${tenant.cpf || '---'} | RG: ${tenant.rg || '---'}</div>
+                </div>
+              `).join('')}
             </div>
           </div>
 
@@ -264,14 +283,18 @@ export class PDFService {
           </div>
 
           <div class="signatures">
-            <div class="sig-box">
-              LOCADOR: ${landlord.name || '---'}<br>
-              CPF: ${landlord.cpf || '---'}
-            </div>
-            <div class="sig-box">
-              LOCATÁRIO: ${tenant.name || '---'}<br>
-              CPF: ${tenant.cpf || '---'}
-            </div>
+            ${landlords.map((landlord: any, i: number) => `
+              <div class="sig-box">
+                LOCADOR${landlords.length > 1 ? ` ${i + 1}` : ''}: ${landlord.name || '---'}<br>
+                CPF: ${landlord.cpf || '---'}
+              </div>
+            `).join('')}
+            ${tenants.map((tenant: any, i: number) => `
+              <div class="sig-box">
+                LOCATÁRIO${tenants.length > 1 ? ` ${i + 1}` : ''}: ${tenant.name || '---'}<br>
+                CPF: ${tenant.cpf || '---'}
+              </div>
+            `).join('')}
             <div class="sig-box">
               VISTORIADOR: ${inspector.name || inspection.user?.name || '---'}<br>
               CRECI: ${inspector.creci || inspection.user?.creci || '---'}

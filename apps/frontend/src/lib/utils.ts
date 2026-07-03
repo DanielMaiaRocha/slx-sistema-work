@@ -5,6 +5,35 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export type Party = { name: string; cpf: string; rg: string; profession: string };
+
+/**
+ * The locador (`landlordData`) and locatário (`tenantData`) fields each used to
+ * hold a single party object; both can now hold several. Normalize whatever is
+ * stored — a raw JSON string, a parsed object (legacy single party), or an
+ * array — into an array of party objects for the UI. Always returns at least
+ * one entry so the form/detail view has a card to render (an empty card shows
+ * the "Não informado" fallbacks).
+ */
+export function normalizeParties(raw: unknown): Party[] {
+  let data: unknown = raw;
+  if (typeof raw === 'string') {
+    try { data = JSON.parse(raw || '{}'); } catch { data = {}; }
+  }
+  const arr = Array.isArray(data)
+    ? data
+    : (data && typeof data === 'object' ? [data] : []);
+  const mapped = arr
+    .filter((t: any) => t && typeof t === 'object')
+    .map((t: any) => ({
+      name: t.name || '',
+      cpf: t.cpf || '',
+      rg: t.rg || '',
+      profession: t.profession || '',
+    }));
+  return mapped.length ? mapped : [{ name: '', cpf: '', rg: '', profession: '' }];
+}
+
 /**
  * Resolves a media URL to a full, fetchable URL.
  * Handles:

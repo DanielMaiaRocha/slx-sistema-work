@@ -261,9 +261,8 @@ export class UserController {
     try {
       const data: any = {
         name: name === 'N/A' ? undefined : name,
-        email: email === 'N/A' ? undefined : email,
         role,
-        phone: phone === 'N/A' || !phone ? null : phone.replace(/\D/g, ''),
+        phone: phone === 'N/A' || !phone ? null : String(phone).replace(/\D/g, ''),
       };
 
       if (password && password !== 'NO_PASSWORD_MANAGED_LOCALLY') {
@@ -281,24 +280,36 @@ export class UserController {
         $or: [{ _id: id }, { asaasId: normalizedId }, { asaasId: id }],
       }).lean();
 
-      if (data.email) {
+      // ── E-mail handling ──
+      // Only validate/touch the e-mail when a genuinely NEW address is provided.
+      // A pure role/profile edit (e.g. turning an inquilino into proprietário)
+      // keeps the same e-mail, so it must never be blocked by the global
+      // unique-email constraint — that was the "e-mail já cadastrado" bug.
+      const newEmail = email && email !== 'N/A' ? String(email).trim().toLowerCase() : '';
+      const currentEmail = (existing?.email || '').toLowerCase();
+
+      if (newEmail && newEmail !== currentEmail) {
         const emailCollision: any = await User.findOne({
-          email: data.email,
-          _id: { $ne: existing?._id },
+          email: newEmail,
+          ...(existing?._id ? { _id: { $ne: existing._id } } : {}),
         }).lean();
 
         if (emailCollision) {
-          const name1Words = emailCollision.name.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
-          const name2Words = (name || '').toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
-          const isSamePerson = name1Words.some((w: string) => name2Words.includes(w));
-
-          if (isSamePerson) {
-            delete data.email;
-          } else {
-            return res.status(400).json({ error: 'Este e-mail já está em uso por outro usuário.' });
+          if (existing) {
+            // Editing an existing record → a real conflict with another user.
+            return res.status(400).json({
+              error: `Este e-mail já está em uso por ${emailCollision.name || 'outro usuário'}.`,
+            });
           }
+          // Creating a brand-new local override for an Asaas customer → don't
+          // steal the address, fall back to a unique placeholder so the record
+          // can still be created.
+          data.email = `${id.toLowerCase()}@asaas-sync.com`;
+        } else {
+          data.email = newEmail;
         }
       }
+      // else: e-mail unchanged → leave it out of `data` so it's preserved as-is.
 
       let user: any;
       if (existing) {
@@ -306,9 +317,10 @@ export class UserController {
       } else if (isAsaasId) {
         user = await User.create({
           ...data,
+          email: data.email || `${id.toLowerCase()}@asaas-sync.com`,
           asaasId: normalizedId,
           tenantId: req.tenantId,
-          password: 'NO_PASSWORD_MANAGED_LOCALLY',
+          password: data.password || 'NO_PASSWORD_MANAGED_LOCALLY',
         });
       } else {
         return res.status(404).json({ error: `Usuário não encontrado (ID: ${id}).` });

@@ -942,15 +942,25 @@ export default function UsersPage() {
               <div className="p-6 space-y-5">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Completo</label>
-                  <input 
+                  <input
                     type="text" value={editingUser?.name || ''}
                     onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all"
                   />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail</label>
+                  <input
+                    type="email"
+                    value={editingUser?.email && editingUser.email !== 'N/A' ? editingUser.email : ''}
+                    onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                    placeholder="email@exemplo.com"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 text-sm focus:border-primary/50 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone</label>
-                  <input 
+                  <input
                     type="text" value={formatPhone(editingUser?.phone || '')}
                     onChange={(e) => setEditingUser({...editingUser, phone: e.target.value.replace(/\D/g, '').slice(0, 11)})}
                     placeholder="(00) 00000-0000"
